@@ -1,0 +1,423 @@
+#' plot_fq_dt
+#'
+#' @param fq_dt output of \code{\link{make_fq_dt}}
+#'
+#' @return a ggplot shoing read counts from fastq files
+#' @export
+#'
+#' @examples
+#' fq_files = dir("inst/extdata", pattern = "(fq$)|(fq.gz$)|(fastq$)|(fastq.gz$)", full.names = TRUE)
+#' fq_dt = make_fq_dt(fq_files, fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"))
+#' plot_fq_dt(fq_dt)
+plot_fq_dt = function(fq_dt){
+  p_fq1 = ggplot(fq_dt,
+                 aes(x = name, y = count, fill = treatment)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+          plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+    scale_y_continuous(labels = function(x)x/1e6) +
+    labs(y = "FASTQ reads (M)", x = "")
+  p_fq1
+}
+
+#' plot_feature_comparison
+#'
+#' @param peak_grs list of GRanges peak sets
+#' @param min_fraction numeric fraction from 0 to 1. min_fraction of peaks for consensus. Default is 0.
+#' @param min_number numeric from 2 to length of peak_gres. min_number of peaks for consesensus. default is 2.
+#' @param force_euler logical. If TRUE, Euler plots will generate for more than 8 peak sets, may be very slow! Default is FALSE
+#'
+#' @return Nested list of plots for peak overlaps. Outer list contains "all" and "consensus" sets of plots.  Inner list has a barplot, binary heatmap and upset
+#' @export
+#'
+#' @examples
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+#' names(peak_grs) = sub("_rand.+", "", names(peak_grs))
+#' peak_plots = plot_feature_comparison(peak_grs)
+#'
+#' #plotting looks like this:
+#' peak_plots$all$venn
+#'
+#' #possible assembly of plots
+#' cowplot::plot_grid(ncol = 1,
+#'   cowplot::plot_grid(plotlist = peak_plots$all[1:3], nrow = 1),
+#'   cowplot::plot_grid(plotlist = peak_plots$all[4:5], nrow = 1)
+#' )
+#'
+#' cowplot::plot_grid(ncol = 1,
+#'   cowplot::plot_grid(plotlist = peak_plots$consensus[1:3], nrow = 1),
+#'   cowplot::plot_grid(plotlist = peak_plots$consensus[4:5], nrow = 1)
+#' )
+#'
+plot_feature_comparison = function(peak_grs, min_fraction = 0, min_number = 2, force_euler = FALSE){
+  olaps_all = ssvOverlapIntervalSets(c(peak_grs))
+
+  p_peak_counts_all = ssvFeatureBars(peak_grs, bar_colors = "black", show_counts = FALSE, counts_text_colors = "gray60") +
+    guides(fill = "none") +
+    scale_y_continuous(labels = function(x)x/1e3) +
+    labs(y = "peak count (k)", title = "all peaks", subtitle = paste("counts:", formatC(max(lengths(peak_grs)), big.mark = ",", format = "d"), "max"), x = "")
+
+  p_peak_overlaps_all = ssvFeatureBinaryHeatmap(olaps_all, raster_approximation = TRUE) +
+    labs(title = "all peaks", subtitle = paste("overlaps:", formatC(length(olaps_all), big.mark = ",", format = "d"), "regions"))
+
+  p_peak_upset_all = ssvFeatureUpset(olaps_all) +
+    labs(title = "all peaks", subtitle = paste("overlaps:", formatC(length(olaps_all), big.mark = ",", format = "d"), "regions"))
+
+  if(length(peak_grs) < 4){
+    p_peak_venn_all = ssvFeatureVenn(olaps_all) +
+      labs(title = "all peaks", subtitle = paste("overlaps:", formatC(length(olaps_all), big.mark = ",", format = "d"), "regions"))
+  }else{
+    p_peak_venn_all = ggplot() + theme_void() + labs(title = "Can't run venn for more than 3 groups")
+  }
+
+  if(length(peak_grs) < 9 || force_euler){
+    p_peak_euler_all = ssvFeatureEuler(olaps_all) +
+      labs(title = "all peaks", subtitle = paste("overlaps:", formatC(length(olaps_all), big.mark = ",", format = "d"), "regions"))
+  }else{
+    p_peak_euler_all = ggplot() + theme_void() + labs(title = "Can't run Euler for more than 8 groups.\nCan force with force_euler = TRUE.")
+  }
+
+  message("consensus peaks...")
+  olaps_consensus = ssvConsensusIntervalSets(peak_grs, min_fraction = min_fraction, min_number = max(2, min(min_number, length(peak_grs))))
+  p_peak_counts_consenus = ssvFeatureBars(olaps_consensus, bar_colors = "black", show_counts = FALSE, counts_text_colors = "gray60" ) +
+    guides(fill = "none") +
+    scale_y_continuous(labels = function(x)x/1e3) +
+    labs(y = "peak count (k)", title = "consensus peaks only", subtitle = paste("counts:", formatC(max(colSums(as.data.frame(mcols(olaps_consensus)))), big.mark = ",", format = "d"), "max"))
+
+  p_peak_overlaps_consensus = ssvFeatureBinaryHeatmap(olaps_consensus, raster_approximation = TRUE) +
+    labs(title = "consensus peaks only", subtitle = paste("overlaps:", formatC(length(olaps_consensus), big.mark = ",", format = "d"), "regions"))
+
+  p_peak_upset_consensus = ssvFeatureUpset(olaps_consensus) +
+    labs(title = "consensus peaks only", subtitle = paste("overlaps:", formatC(length(olaps_consensus), big.mark = ",", format = "d"), "regions"))
+
+  if(length(peak_grs) < 4){
+    p_peak_venn_consensus = ssvFeatureVenn(olaps_consensus) +
+      labs(title = "consensus peaks only", subtitle = paste("overlaps:", formatC(length(olaps_consensus), big.mark = ",", format = "d"), "regions"))
+  }else{
+    p_peak_venn_consensus = ggplot() + theme_void() + labs(title = "Can't run venn for more than 3 groups")
+  }
+
+  if(length(peak_grs) < 9 || force_euler){
+    p_peak_euler_consensus = ssvFeatureEuler(olaps_consensus) +
+      labs(title = "consensus peaks only", subtitle = paste("overlaps:", formatC(length(olaps_consensus), big.mark = ",", format = "d"), "regions"))
+  }else{
+    p_peak_euler_consensus = ggplot() + theme_void() + labs(title = "Can't run Euler for more than 8 groups.\nCan force with force_euler = TRUE.")
+  }
+
+  return(list(
+    all = list(
+      count = p_peak_counts_all,
+      overlap = p_peak_overlaps_all,
+      upset = p_peak_upset_all,
+      venn = p_peak_venn_all,
+      euler = p_peak_euler_all),
+    consensus = list(
+      count = p_peak_counts_consenus,
+      overlap = p_peak_overlaps_consensus,
+      upset = p_peak_upset_consensus,
+      venn = p_peak_venn_consensus,
+      euler = p_peak_euler_consensus)
+  ))
+}
+
+#' plot_frip_dt
+#'
+#' @param frip_dt output from \code{\link{make_frip_dt}}
+#' @param peak_dt (optional) output from \code{\link{make_peak_dt}}
+#' @param fq_dt (optional) output from \code{\link{make_fq_dt}}
+#' @param query_gr (optional) The GRanges used to create frip_dt, only necessary to calculate the fraction of genome covered by peaks.
+#' @param sort_by character. One of "frip" or "N". Should plots be sorted by decreasing FRIP ("frip") or total reads ("N")? Default is "frip".
+#' @param name_lev character. Name levels to impose manual ordering.  sort_by is not ignored if this is not NULL. Default is NULL.
+#'
+#' @return list of ggplot plots relevant to FRIP.
+#' @export
+#'
+#' @examples
+#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
+#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#'
+#' query_gr = easyLoad_bed(peak_file)[[1]]
+#'
+#' frip_dt = make_frip_dt(bam_file, query_gr)
+plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, sort_by = c("frip", "N")[1], name_lev = NULL){
+  if(is.null(name_lev)){
+    if(sort_by == "N"){
+      name_lev = as.character(frip_dt[, median(N) , .(name)][rev(order(V1))]$name)
+    }else if(sort_by == "frip"){
+      name_lev = as.character(frip_dt[, median(frip) , .(name)][rev(order(V1))]$name)
+    }else{
+      stop("sort_by must be one of frip or N")
+    }
+  }
+  stopifnot(all(frip_dt$name %in% name_lev))
+  stopifnot(all(name_lev %in% frip_dt$name))
+  frip_dt$name = factor(frip_dt$name, levels = name_lev)
+
+  if(is.null(fq_dt)){
+    p_fq1 = NULL
+  }else{
+    stopifnot(all(fq_dt$name %in% name_lev))
+    fq_dt$name = factor(fq_dt$name, levels = name_lev)
+    p_fq1 = ggplot(fq_dt,
+                   aes(x = name, y = fastq_count, fill = treatment)) +
+      geom_bar(stat = "identity") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+            plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+      scale_y_continuous(labels = function(x)x/1e6) +
+      labs(y = "FASTQ reads (M)", x = "")
+  }
+  p_input1 = ggplot(unique(frip_dt[, .(name, mapped_reads, treatment)]),
+                    aes(x = name, y = mapped_reads, fill = treatment)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+          plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+    scale_y_continuous(labels = function(x)x/1e6) +
+    labs(y = "BAM mapped reads (M)", x = "")
+
+  if(is.null(peak_dt)){
+    p_peaks1 = NULL
+  }else{
+    stopifnot(all(peak_dt$name %in% name_lev))
+    peak_dt$name = factor(peak_dt$name, levels = name_lev)
+    p_peaks1 = ggplot(peak_dt, aes(x = name, y = peak_count, fill = treatment)) +
+      geom_bar(stat = 'identity') +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1),
+            plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+      scale_y_continuous(labels = function(x)x/1e3) +
+      labs(y = "peaks (k)", x = "")
+  }
+
+  p_reads1 = ggplot(frip_dt,
+                    aes(x = name, y = N, color = treatment)) +
+    geom_boxplot(outlier.shape = NA) +
+    coord_cartesian(ylim = quantile(frip_dt$N, c(0.1, 0.96))) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+    labs(y = "reads per peak", x = "")
+
+  p_frip1 = ggplot(frip_dt,
+                   aes(x = name, y = frip, color = treatment)) +
+    geom_boxplot(outlier.shape = NA) +
+    coord_cartesian(ylim = quantile(frip_dt$frip, c(0.1, 0.96))) +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+    labs(y = "FRIP per peak", x = "")
+
+  tmp = frip_dt[, .(N = sum(N), mapped_reads = unique(mapped_reads)), .(sample, treatment, name)]
+  tmp[, frip := N / mapped_reads]
+  p_fripSum1 = ggplot(tmp,
+                      aes(x = name, y = frip, fill = treatment)) +
+    geom_bar(stat = "identity") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+    labs(x = "", y = "FRIP")
+
+  if(!is.null(query_gr)){
+    p_fripSum1 = p_fripSum1 + labs(subtitle = paste(sum(width((query_gr)))/3.2e9, "of genome covered by peaks"))
+  }
+
+  return(list(
+    fastq_reads = p_fq1,
+    aligned_reads = p_input1,
+    peaks = p_peaks1,
+    reads_per_peaks = p_reads1,
+    frip_per_peaks = p_frip1,
+    frip_total = p_fripSum1,
+    levels = name_lev
+  ))
+
+}
+
+#' plot_signals
+#'
+#' Performs clustering on signal profiles in prof_dt and produces various plots
+#'
+#' @param prof_dt data.table of signal profiles from \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}.
+#' @param query_gr The GRanges used to produce prof_dt.
+#' @param anno_dt (optional) output from \code{\link{make_anno_dt}}
+#' @param frip_dt (optional) output from \code{\link{make_frip_dt}}
+#' @param name_lev (optional) manual specification for levels of "name" to control ordering.
+#'
+#' @return named list of ggplot plots and relevant data
+#' @export
+#'
+#' @examples
+#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "bw$", full.names = TRUE)
+#' query_dt = make_dt(bw_files)
+#' query_dt[, sample := sub("_FE_random100.A", "", name)]
+#'
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = easyLoad_narrowPeak(peak_files)
+#' query_gr = resize(ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
+#' anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
+#'
+#' prof_dt = ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
+#'
+#' sig_res = plot_signals(prof_dt, query_gr)
+#' sig_res$heatmap
+#'
+#' sig_res.anno = plot_signals(prof_dt, query_gr, anno_dt = anno_dt)
+plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_lev = NULL){
+  if(is.null(prof_dt$name)){
+    prof_dt$name = prof_dt$sample
+  }
+  if(is.null(name_lev)){
+    if(is.factor(prof_dt$name)){
+      name_lev = levels(prof_dt$name)
+    }else if(is.character(prof_dt$name)){
+      name_lev = unique(prof_dt$name)
+    }else{
+      stop("prof_dt$name not character or factor")
+    }
+  }
+  stopifnot(all(unique(prof_dt$name) %in% name_lev))
+  prof_dt$name = factor(prof_dt$name, levels = name_lev)
+  prof_dt$facet = prof_dt$name
+  levels(prof_dt$facet) = gsub("_", "\n", levels(prof_dt$facet))
+
+  prof_dt[, y_relative := y / max(y), .(id)]
+
+  set.seed(0)
+  clust_dt = ssvSignalClustering(prof_dt, fill_ = "y_relative", max_cols = Inf, facet_ = "facet", max_rows = Inf)
+  assign_dt = unique(clust_dt[, .(id, cluster_id)])
+  toplot_id = ssvRecipes::sampleCap(unique(clust_dt$id), 500)
+  p_heat = ssvSignalHeatmap(clust_dt[id %in% toplot_id],
+                            fill_ = "y_relative",
+                            max_cols = Inf,
+                            facet_ = "facet", show_cluster_bars = FALSE)
+  x_vals = unique(prof_dt$x)
+  view_size = diff(range(x_vals)) + abs(x_vals[2] - x_vals[1])
+  p_heat = p_heat +
+    labs(x = paste(view_size, "bp view size"), fill = "relative pileup") +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "bottom")
+
+  if(is.null(anno_dt)){
+    p_clust_boxes = ggplot() + theme_void() + labs(title = "anno_dt not provided")
+    p_heat_anno = ggplot() + theme_void() + labs(title = "anno_dt not provided")
+  }else{
+    # anno_clust_dt = ssvFetchGRanges(anno_grs, resize(query_gr[toplot_id], view_size, fix = "center"), return_data.table = TRUE)
+    anno_clust_dt = anno_dt[id %in% toplot_id]
+    anno_clust_dt$id = factor(anno_clust_dt$id, levels = levels(clust_dt$id))
+    anno_clust_dt$sample = factor(anno_clust_dt$sample, levels = rev(names(anno_grs)))
+    p_heat_anno = ggplot(anno_clust_dt, aes(x = x, y = id, fill = y>0)) +
+      geom_raster() +
+      facet_wrap(~sample, nrow = 1) +
+      theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
+      scale_fill_manual(values = c("FALSE" = "gray80", "TRUE" = "gray20")) +
+      scale_x_continuous(labels = function(x)x/1e3) +
+      labs(fill = "feature overlap", x= "kbp", y = "peak region")
+
+    clust_sizes = unique(clust_dt[, .(cluster_id, id)])[, .N, .(cluster_id)][rev(order(cluster_id))]
+    clust_sizes[, xmin := 0]
+    clust_sizes[, xmax := 1]
+    clust_sizes[, ymin := c(0, cumsum(N)[-length(N)])]
+    clust_sizes[, ymax := cumsum(N)]
+    clust_sizes[, col := as.character(as.numeric(cluster_id)%%2)]
+    clust_sizes$facet = ""
+    p_clust_boxes = ggplot(clust_sizes, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax)) +
+      geom_rect(aes(fill = col), color = "black") +
+      geom_text(aes(label = cluster_id, x = (xmin+xmax)/2, y = (ymin+ymax)/2)) +
+      scale_fill_manual(values = c("0" = "gray70", "1" = 'gray90')) +
+      guides(fill = 'none') +
+      coord_cartesian(expand = FALSE) +
+      theme_void() +
+      facet_grid(~facet)
+  }
+
+
+  if(is.null(frip_dt)){
+    p_fripHeat = ggplot() + theme_void() + labs(title = "frip_dt no provided")
+    p_clust_text = ggplot() + theme_void() + labs(title = "frip_dt no provided")
+  }else{
+    dt.heat = copy(frip_dt)
+    assign_dt = unique(clust_dt[, .(id, cluster_id)])
+    dt.heat = merge(dt.heat, assign_dt, by = "id")
+    tmp = dt.heat[, .(N = sum(N), mapped_reads = unique(mapped_reads)), .(sample, treatment, name, cluster_id)]
+    tmp[, frip := N / mapped_reads]
+
+    .genome_fraction = function(x){
+      sum(width(query_gr[x]))  /3.2e9
+    }
+
+    w_frac = lapply(split(as.character(assign_dt$id), assign_dt$cluster_id), .genome_fraction)
+    w_frac = unlist(w_frac)
+    tmp[, cluster_label := paste0("cluster", cluster_id, "\n", w_frac[cluster_id])]
+
+
+    p_fripHeat = ggplot(tmp,
+                        aes(x = name, y = frip, fill = treatment)) +
+      geom_bar(stat = "identity") +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
+      labs(subtitle = paste(sum(width((query_gr)))/3.2e9, "of genome covered by peaks"), x = "", y = "FRIP") +
+      facet_grid(cluster_label~., scales = "free_y", switch = "y") +
+      theme(strip.text.y = element_text(angle = 0), strip.placement = "outside")
+
+    dt.heat_summary = dt.heat[, .(mean_frip = mean(frip), median_frip = median(frip)), .(name, cluster_id)]
+    dt.heat_summary[, txt_mean := round(mean_frip*1e6, 1)]
+    dt.heat_summary[, txt_median := round(median_frip*1e6, 1)]
+    dt.heat_summary[, txt := paste0(round(mean_frip*1e6, 1), "\n", round(median_frip*1e6, 1))]
+
+    p_clust_text = ggplot(dt.heat_summary, aes(x = name, y = factor(cluster_id), label = txt)) +
+      geom_text(size = 5, color = NA) +
+      geom_text(data = dt.heat_summary, aes(x = name, cluster_id+.1, label = txt_mean), color = "red", vjust = 0) +
+      geom_text(data = dt.heat_summary, aes(x = name, cluster_id-.1, label = txt_median), color = "blue", vjust = 1) +
+      theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), panel.background = element_blank(), panel.grid = element_blank()) +
+      labs(y = "cluster", x= "", title = "mean FRIP e6", subtitle = "median FRIP e6") +
+      theme(plot.title = element_text(size = 14, color = "red"), plot.subtitle = element_text(size = 14, color = "blue"))
+  }
+
+
+  p_heat_l = ssvRecipes::sync_height(list(p_clust_boxes, p_heat, p_heat_anno))
+  pg_heat_top = cowplot::plot_grid(plotlist = p_heat_l, rel_widths = c(1, length(peak_grs)+2, length(anno_grs)+1), nrow = 1)
+  pg_heat = cowplot::plot_grid(ncol = 1,
+                               pg_heat_top,
+                               cowplot::plot_grid(nrow = 1, p_fripHeat, p_clust_text))
+
+  return(list(
+    assembled = pg_heat,
+    heatmap = p_heat,
+    heatmap_sidebar = p_clust_boxes,
+    heatmap_feature_overlap = p_heat_anno,
+    heatmap_cluster_frip = p_fripHeat,
+    heatmap_text_frip = p_clust_text,
+    cluster_assignment = assign_dt
+  ))
+}
+
+#' plot_features_overlap
+#'
+#' @param anno_dt Output from \code{\link{make_anno_dt}}
+#' @param name_lev Optional name levels top apply.
+#'
+#' @return bar plot of feature overlap frequency
+#' @export
+#'
+#' @examples
+#' gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
+#' anno_grs = make_anno_grs(gtf_file)
+#'
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = easyLoad_narrowPeak(peak_files)
+#' names(peak_grs) = sub("_rand.+", "", names(peak_grs))
+#'
+#' anno_dt = make_anno_dt(peak_grs, anno_grs)
+#' plot_features_overlap(anno_dt)
+plot_features_overlap = function(anno_dt, name_lev = NULL){
+  if(!is.null(name_lev)){
+    stopifnot(all(anno_dt$sample %in% name_lev))
+    anno_dt$sample = factor(anno_dt$sample, levels = name_lev)
+  }
+  anno_dt = anno_dt[order(sample)]
+  anno_dt$sample_cnt = factor(anno_dt$sample_cnt, levels = unique(anno_dt$sample_cnt))
+
+  p_features = ggplot(anno_dt, aes(x = sample_cnt, y = fraction, fill = feature)) +
+    geom_bar(stat = "identity") +
+    labs(x = "sample\npeak count") +
+    theme(panel.background = element_blank(),
+          panel.grid.major.y = element_line(color = "black"),
+          panel.grid.minor.y = element_line(color = "black"),
+          panel.grid.major.x = element_blank(),
+          panel.grid.minor.x = element_blank()) +
+    scale_fill_brewer(palette = "Set1") +
+    labs(title = "Feature overlaps for peaks") +
+    theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
+  return(list(plot = p_features, data = anno_dt))
+}
