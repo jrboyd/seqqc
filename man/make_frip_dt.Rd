@@ -23,8 +23,10 @@ create a data.table with FRIP data.  To be used with
 \code{\link{plot_frip_dt}}
 }
 \examples{
-peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+peak_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bed$", full.names = TRUE)
+bam_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bam$", full.names = TRUE)
 
 query_gr = easyLoad_bed(peak_file)[[1]]
 

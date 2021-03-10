@@ -52,8 +52,10 @@ ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr.centered), nclust = 4)+
   labs(title = "After centering")
 
 #bam example with 1 bam, query_dt can just be file paths
-peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+peak_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bed$", full.names = TRUE)
+bam_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bam$", full.names = TRUE)
 
 query_gr2 = easyLoad_bed(peak_file)[[1]]
 set.seed(0)

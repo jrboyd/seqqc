@@ -42,8 +42,10 @@ list fo tidy data.table of SCC data for bam_file
 based on peakrefine::calcSCCMetrics
 }
 \examples{
-peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+peak_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bed$", full.names = TRUE)
+bam_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bam$", full.names = TRUE)
 
 query_gr = easyLoad_bed(peak_file)[[1]]
 

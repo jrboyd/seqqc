@@ -9,7 +9,7 @@ plot_frip_dt(
   peak_dt = NULL,
   fq_dt = NULL,
   query_gr = NULL,
-  sort_by = c("frip", "N")[1],
+  sort_by = c("frip", "reads_in_peak")[1],
   name_lev = NULL
 )
 }
@@ -22,7 +22,7 @@ plot_frip_dt(
 
 \item{query_gr}{(optional) The GRanges used to create frip_dt, only necessary to calculate the fraction of genome covered by peaks.}
 
-\item{sort_by}{character. One of "frip" or "N". Should plots be sorted by decreasing FRIP ("frip") or total reads ("N")? Default is "frip".}
+\item{sort_by}{character. One of "frip" or "reads_in_peak". Should plots be sorted by decreasing FRIP ("frip") or total reads ("reads_in_peak")? Default is "frip".}
 
 \item{name_lev}{character. Name levels to impose manual ordering.  sort_by is not ignored if this is not NULL. Default is NULL.}
 }
@@ -33,10 +33,15 @@ list of ggplot plots relevant to FRIP.
 plot_frip_dt
 }
 \examples{
-peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
 
-query_gr = easyLoad_bed(peak_file)[[1]]
+bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+query_dt.bam = make_dt(bam_files)
 
-frip_dt = make_frip_dt(bam_file, query_gr)
+frip_dt = make_frip_dt(query_dt.bam, query_gr)
+frip_plots = plot_frip_dt(frip_dt)
+frip_plots$frip_per_peaks
+frip_plots$frip_total
 }

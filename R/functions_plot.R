@@ -5,9 +5,15 @@
 #' @return a ggplot shoing read counts from fastq files
 #' @export
 #'
+#' @import ggplot2
+#' @rawNamespace import(data.table, except = c(shift, first, second, last))
+#'
 #' @examples
-#' fq_files = dir("inst/extdata", pattern = "(fq$)|(fq.gz$)|(fastq$)|(fastq.gz$)", full.names = TRUE)
-#' fq_dt = make_fq_dt(fq_files, fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"))
+#' fq_files = dir("inst/extdata",
+#'   pattern = "(fq$)|(fq.gz$)|(fastq$)|(fastq.gz$)",
+#'   full.names = TRUE)
+#' fq_dt = make_fq_dt(fq_files,
+#'   fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"))
 #' plot_fq_dt(fq_dt)
 plot_fq_dt = function(fq_dt){
   p_fq1 = ggplot(fq_dt,
@@ -127,27 +133,32 @@ plot_feature_comparison = function(peak_grs, min_fraction = 0, min_number = 2, f
 #' @param peak_dt (optional) output from \code{\link{make_peak_dt}}
 #' @param fq_dt (optional) output from \code{\link{make_fq_dt}}
 #' @param query_gr (optional) The GRanges used to create frip_dt, only necessary to calculate the fraction of genome covered by peaks.
-#' @param sort_by character. One of "frip" or "N". Should plots be sorted by decreasing FRIP ("frip") or total reads ("N")? Default is "frip".
+#' @param sort_by character. One of "frip" or "reads_in_peak". Should plots be sorted by decreasing FRIP ("frip") or total reads ("reads_in_peak")? Default is "frip".
 #' @param name_lev character. Name levels to impose manual ordering.  sort_by is not ignored if this is not NULL. Default is NULL.
 #'
 #' @return list of ggplot plots relevant to FRIP.
 #' @export
 #'
 #' @examples
-#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+#' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
 #'
-#' query_gr = easyLoad_bed(peak_file)[[1]]
+#' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+#' query_dt.bam = make_dt(bam_files)
 #'
-#' frip_dt = make_frip_dt(bam_file, query_gr)
-plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, sort_by = c("frip", "N")[1], name_lev = NULL){
+#' frip_dt = make_frip_dt(query_dt.bam, query_gr)
+#' frip_plots = plot_frip_dt(frip_dt)
+#' frip_plots$frip_per_peaks
+#' frip_plots$frip_total
+plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, sort_by = c("frip", "reads_in_peak")[1], name_lev = NULL){
   if(is.null(name_lev)){
-    if(sort_by == "N"){
-      name_lev = as.character(frip_dt[, median(N) , .(name)][rev(order(V1))]$name)
+    if(sort_by == "reads_in_peak"){
+      name_lev = as.character(frip_dt[, median(reads_in_peak) , .(name)][rev(order(V1))]$name)
     }else if(sort_by == "frip"){
       name_lev = as.character(frip_dt[, median(frip) , .(name)][rev(order(V1))]$name)
     }else{
-      stop("sort_by must be one of frip or N")
+      stop("sort_by must be one of frip or reads_in_peak")
     }
   }
   stopifnot(all(frip_dt$name %in% name_lev))
@@ -189,9 +200,9 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
   }
 
   p_reads1 = ggplot(frip_dt,
-                    aes(x = name, y = N, color = treatment)) +
+                    aes(x = name, y = reads_in_peak, color = treatment)) +
     geom_boxplot(outlier.shape = NA) +
-    coord_cartesian(ylim = quantile(frip_dt$N, c(0.1, 0.96))) +
+    coord_cartesian(ylim = quantile(frip_dt$reads_in_peak, c(0.1, 0.96))) +
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
     labs(y = "reads per peak", x = "")
 
@@ -202,8 +213,8 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), plot.margin = margin(.01, .01, .01, .1, unit = "npc")) +
     labs(y = "FRIP per peak", x = "")
 
-  tmp = frip_dt[, .(N = sum(N), mapped_reads = unique(mapped_reads)), .(sample, treatment, name)]
-  tmp[, frip := N / mapped_reads]
+  tmp = frip_dt[, .(reads_in_peak = sum(reads_in_peak), mapped_reads = unique(mapped_reads)), .(sample, treatment, name)]
+  tmp[, frip := reads_in_peak / mapped_reads]
   p_fripSum1 = ggplot(tmp,
                       aes(x = name, y = frip, fill = treatment)) +
     geom_bar(stat = "identity") +
@@ -228,12 +239,16 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
 
 #' plot_signals
 #'
-#' Performs clustering on signal profiles in prof_dt and produces various plots
+#' Performs clustering on signal profiles in prof_dt and produces various plots. Optionally outputs annotation (with anno_grs) and/or FRIP (with frip_dt) plots that incorporate signal clustering information.
 #'
 #' @param prof_dt data.table of signal profiles from \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}.
 #' @param query_gr The GRanges used to produce prof_dt.
+#' @param assign_dt (optional) Precalculated clustering.  From running \link[seqsetvis]{ssvSignalClustering} followed by \code{\link{make_assign_dt}}
+#' @param n_to_plot numeric. Number of items plotted in heatmap.  Default is 500.
+#' @param fill_var character. Variable in prof_dt to cluster and plot on. Default of y_relative is the fraction of max y per id.
 #' @param anno_grs (optional) output from \code{\link{make_anno_grs}}
 #' @param frip_dt (optional) output from \code{\link{make_frip_dt}}
+#' @param scc_dt (optional) output from \code{\link{make_scc_dt}}
 #' @param name_lev (optional) manual specification for levels of "name" to control ordering.
 #' @param nclust Number of clusters for heatmap. Defaults to 6.
 #'
@@ -254,27 +269,31 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
 #' sig_res = plot_signals(prof_dt, query_gr)
 #' sig_res$heatmap
 #' sig_res$heatmap_sidebar
+#' sig_res$cluster_assignment
 #'
 #' gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
 #' anno_grs = make_anno_grs(gtf_file)
 #'
-#' sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+#' sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs)
 #' sig_res.anno$heatmap
-#' sig_res.anno$heatmap_feature_overlap
+#' sig_res.anno$annotation_heatmap
 #'
 #' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
 #' query_dt.bam = make_dt(bam_files)
 #' frip_dt = make_frip_dt(query_dt.bam, query_gr)
 #'
-#' scc_dt = make_scc_dt(query_dt.bam, query_gr)
-#' ggplot(scc_dt$average_correlation, aes(x = shift, y = correlation, color = sample)) + geom_path()
-#'
-#' sig_res.frip = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+#' sig_res.frip = plot_signals(prof_dt, query_gr, frip_dt = frip_dt)
 #' sig_res.frip$heatmap
-#' sig_res.frip$heatmap_cluster_frip
+#' sig_res.frip$frip_bars_per_cluster
+#' sig_res.frip$frip_text_per_cluster
 #'
-#' plot_signals(prof_dt, query_gr, anno_grs = anno_grs, )
-plot_signals = function(prof_dt, query_gr, anno_grs = NULL, frip_dt = NULL, name_lev = NULL, nclust = 6){
+#' scc_dt = make_scc_dt(query_dt.bam, query_gr)
+#' sig_res.scc = plot_signals(prof_dt, query_gr, scc_dt = scc_dt)
+#'
+#'sig_res.scc$scc_curves_per_cluster
+#'sig_res.scc$scc_dots_per_cluster
+#'
+plot_signals = function(prof_dt, query_gr, assign_dt = NULL, n_to_plot = 500, fill_var = "y_relative", anno_grs = NULL, frip_dt = NULL, scc_dt = NULL, name_lev = NULL, nclust = 6){
   if(is.null(prof_dt$name)){
     prof_dt$name = prof_dt$sample
   }
@@ -294,23 +313,30 @@ plot_signals = function(prof_dt, query_gr, anno_grs = NULL, frip_dt = NULL, name
 
   prof_dt[, y_relative := y / max(y), .(id)]
 
-  set.seed(0)
-  clust_dt = ssvSignalClustering(prof_dt, fill_ = "y_relative", max_cols = Inf, facet_ = "facet", max_rows = Inf, nclust = nclust)
-  assign_dt = unique(clust_dt[, .(id, cluster_id)])
-  toplot_id = ssvRecipes::sampleCap(unique(clust_dt$id), 500)
+  if(is.null(assign_dt)){
+    set.seed(0)
+    clust_dt = ssvSignalClustering(prof_dt, fill_ = fill_var, max_cols = Inf, facet_ = "facet", max_rows = Inf, nclust = nclust)
+    assign_dt = unique(clust_dt[, .(id, cluster_id)])
+  }else{
+    # assign_dt = assign_dt[order(id)]
+    clust_dt = merge(prof_dt, assign_dt, by = "id")
+    clust_dt$id = factor(clust_dt$id, levels = levels(assign_dt$id))
+  }
+
+  toplot_id = sampleCap(unique(clust_dt$id), n_to_plot)
 
   x_vals = unique(prof_dt$x)
   view_size = diff(range(x_vals)) + abs(x_vals[2] - x_vals[1])
 
   p_heat = ssvSignalHeatmap(clust_dt[id %in% toplot_id],
-                            fill_ = "y_relative",
+                            fill_ = fill_var,
                             max_cols = Inf,
                             facet_ = "facet", show_cluster_bars = FALSE)
 
   p_heat_sb = ssvSignalHeatmap.ClusterBars(clust_dt[id %in% toplot_id],
-                               fill_ = "y_relative",
-                               max_cols = Inf,
-                               facet_ = "facet", show_cluster_bars = FALSE, return_unassembled_plots = TRUE)
+                                           fill_ = fill_var,
+                                           max_cols = Inf,
+                                           facet_ = "facet", show_cluster_bars = FALSE, return_unassembled_plots = TRUE)
   p_heat_sb$heatmap = p_heat_sb$heatmap +
     labs(x = paste(view_size, "bp view size"), fill = "relative pileup") +
     theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "bottom")
@@ -397,29 +423,63 @@ plot_signals = function(prof_dt, query_gr, anno_grs = NULL, frip_dt = NULL, name
       theme(plot.title = element_text(size = 14, color = "red"), plot.subtitle = element_text(size = 14, color = "blue"))
   }
 
-  # p_heat_l = ssvRecipes::sync_height(list(p_clust_boxes, p_heat, p_heat_anno))
-  # pg_heat_top = cowplot::plot_grid(plotlist = p_heat_l, rel_widths = c(1, length(peak_grs)+2, length(anno_grs)+1), nrow = 1)
-  # pg_heat = cowplot::plot_grid(ncol = 1,
-  #                              pg_heat_top,
-  #                              cowplot::plot_grid(nrow = 1, p_fripHeat, p_clust_text))
+  if(is.null(scc_dt)){
+    p_scc_correlation = ggplot() + theme_void() + labs(title = "scc_dt no provided")
+    p_scc_frag_vs_read = ggplot() + theme_void() + labs(title = "scc_dt no provided")
+  }else{
+    scc_dt_agg = scc_dt$full_correlation_results
+    scc_dt_agg = merge(scc_dt_agg, assign_dt, by = "id")
+    scc_dt_agg = scc_dt_agg[, .(correlation = mean(correlation)), .(sample, shift, name, cluster_id)]
+
+    p_scc_correlation = ggplot(scc_dt_agg, aes(x = shift, y = correlation)) +
+      geom_path() +
+      facet_grid(cluster_id~name) +
+      geom_vline(data = scc_dt$read_length, aes(xintercept = read_length), color = "red", linetype = 2) +
+      geom_vline(data = scc_dt$fragment_length, aes(xintercept = fragment_length), color = "blue", linetype = 2) +
+      labs(title = "Strand Cross Correlation (SCC)", subtitle = "estimated fragment size in blue, read length in red")
+      # annotate("line", x = rep(scc_dt$read_length, 2), y = range(scc_dt$average_correlation$correlation), linetype = 2, color = "red") +
+      # annotate("text", x = scc_res$read_length + 3, y = mean(scc_res$average_correlation$correlation), label = paste0("read length\n", scc_res$read_length), hjust = 0, vjust = .5, color = "red") +
+      # annotate("line", x = rep(scc_dt$fragment_length, 2), y = range(scc_dt$average_correlation$correlation), linetype = 2, color = "blue") #+
+      # annotate("text", x = scc_res$fragment_length + 3, y = mean(scc_res$average_correlation$correlation), label = paste0("fragment length estimate\n", scc_res$fragment_length), hjust = 0, vjust = .5, color = "blue") +
+      # labs(title = "Strand Cross Correlation (SCC)", subtitle = paste(basename(bam_file), "@", basename(np_file)))
+
+
+    scc_dt_p = merge(scc_dt$read_correlation[, .(name, id, read_correlation = correlation)],
+                     scc_dt$stable_fragment_correlation[, .(name, id, fragment_correlation = correlation)], by = c("name", "id"))
+    scc_dt_p = merge(scc_dt_p, assign_dt, by = "id")
+    p_scc_frag_vs_read = ggplot(scc_dt_p, aes(x = read_correlation, y = fragment_correlation)) +
+      annotate("rect", xmin = .9, xmax = 1.03,
+               ymin = min(scc_dt_p$fragment_correlation),
+               ymax = max(scc_dt_p$fragment_correlation), fill = "#FF000015") +
+      annotate("point", x = scc_dt_p$read_correlation, y = scc_dt_p$fragment_correlation, color = 'gray80', size = .4) +
+      geom_point() +
+      expand_limits(x = c(0, 1), y = c(0, 1)) +
+      facet_grid(cluster_id~name) +
+      theme(panel.background = element_blank(), panel.grid = element_blank()) +
+      labs(title = "Peaks in the red zone have quite high\ncorrelation at read length and are likely artifacts",
+           x = "read length SCC",
+           y = "fragment length estimate SCC")
+  }
 
   return(list(
     # assembled = pg_heat,
     heatmap = p_heat,
     heatmap_sidebar = p_heat_sb_assembled,
-    heatmap_feature_overlap = p_heat_anno,
-    heatmap_cluster_frip = p_fripHeat,
-    heatmap_text_frip = p_clust_text,
-    cluster_assignment = assign_dt
+    cluster_assignment = assign_dt,
+    annotation_heatmap = p_heat_anno,
+    frip_bars_per_cluster = p_fripHeat,
+    frip_text_per_cluster = p_clust_text,
+    scc_curves_per_cluster = p_scc_correlation,
+    scc_dots_per_cluster = p_scc_frag_vs_read
   ))
 }
 
-#' plot_features_overlap
+#' plot_anno_overlap
 #'
 #' @param anno_dt Output from \code{\link{make_anno_dt}}
 #' @param name_lev Optional name levels top apply.
 #'
-#' @return bar plot of feature overlap frequency
+#' @return bar plot of annotation overlap frequency
 #' @export
 #'
 #' @examples
@@ -431,8 +491,8 @@ plot_signals = function(prof_dt, query_gr, anno_grs = NULL, frip_dt = NULL, name
 #' names(peak_grs) = sub("_rand.+", "", names(peak_grs))
 #'
 #' anno_dt = make_anno_dt(peak_grs, anno_grs)
-#' plot_features_overlap(anno_dt)
-plot_features_overlap = function(anno_dt, name_lev = NULL){
+#' plot_anno_overlap(anno_dt)
+plot_anno_overlap = function(anno_dt, name_lev = NULL){
   if(!is.null(name_lev)){
     stopifnot(all(anno_dt$sample %in% name_lev))
     anno_dt$sample = factor(anno_dt$sample, levels = name_lev)

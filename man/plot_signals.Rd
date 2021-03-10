@@ -7,8 +7,12 @@
 plot_signals(
   prof_dt,
   query_gr,
+  assign_dt = NULL,
+  n_to_plot = 500,
+  fill_var = "y_relative",
   anno_grs = NULL,
   frip_dt = NULL,
+  scc_dt = NULL,
   name_lev = NULL,
   nclust = 6
 )
@@ -18,9 +22,17 @@ plot_signals(
 
 \item{query_gr}{The GRanges used to produce prof_dt.}
 
+\item{assign_dt}{(optional) Precalculated clustering.  From running \link[seqsetvis]{ssvSignalClustering} followed by \code{\link{make_assign_dt}}}
+
+\item{n_to_plot}{numeric. Number of items plotted in heatmap.  Default is 500.}
+
+\item{fill_var}{character. Variable in prof_dt to cluster and plot on. Default of y_relative is the fraction of max y per id.}
+
 \item{anno_grs}{(optional) output from \code{\link{make_anno_grs}}}
 
 \item{frip_dt}{(optional) output from \code{\link{make_frip_dt}}}
+
+\item{scc_dt}{(optional) output from \code{\link{make_scc_dt}}}
 
 \item{name_lev}{(optional) manual specification for levels of "name" to control ordering.}
 
@@ -30,7 +42,7 @@ plot_signals(
 named list of ggplot plots and relevant data
 }
 \description{
-Performs clustering on signal profiles in prof_dt and produces various plots
+Performs clustering on signal profiles in prof_dt and produces various plots. Optionally outputs annotation (with anno_grs) and/or FRIP (with frip_dt) plots that incorporate signal clustering information.
 }
 \examples{
 bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
@@ -46,24 +58,28 @@ prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE
 sig_res = plot_signals(prof_dt, query_gr)
 sig_res$heatmap
 sig_res$heatmap_sidebar
+sig_res$cluster_assignment
 
 gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
 anno_grs = make_anno_grs(gtf_file)
 
-sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs)
 sig_res.anno$heatmap
-sig_res.anno$heatmap_feature_overlap
+sig_res.anno$annotation_heatmap
 
 bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
 query_dt.bam = make_dt(bam_files)
 frip_dt = make_frip_dt(query_dt.bam, query_gr)
 
-scc_dt = make_scc_dt(query_dt.bam, query_gr)
-ggplot(scc_dt$average_correlation, aes(x = shift, y = correlation, color = sample)) + geom_path()
-
-sig_res.frip = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+sig_res.frip = plot_signals(prof_dt, query_gr, frip_dt = frip_dt)
 sig_res.frip$heatmap
-sig_res.frip$heatmap_cluster_frip
+sig_res.frip$frip_bars_per_cluster
+sig_res.frip$frip_text_per_cluster
 
-plot_signals(prof_dt, query_gr, anno_grs = anno_grs, )
+scc_dt = make_scc_dt(query_dt.bam, query_gr)
+sig_res.scc = plot_signals(prof_dt, query_gr, scc_dt = scc_dt)
+
+sig_res.scc$scc_curves_per_cluster
+sig_res.scc$scc_dots_per_cluster
+
 }

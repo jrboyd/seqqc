@@ -82,6 +82,36 @@ make_anno_dt =  function(peak_grs, anno_grs, name_lev = NULL){
   anno_cnt
 }
 
+#' make_assign_dt
+#'
+#' @param clust_dt Output from \link[seqsetvis]{ssvSignalClustering}
+#' @param cluster_var variable name with cluster assignment info. Default is "cluster_id".
+#' @param id_var variable name with id info. Default is "id".
+#'
+#' @return data.table with id and cluster_id assignment info.
+#' @export
+#'
+#' @examples
+#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
+#' query_dt = make_dt(bw_files)
+#' query_dt[, sample := sub("_FE_random100.A", "", name)]
+#'
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+#' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
+#'
+#' prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
+#'
+#' clust_dt = ssvSignalClustering(prof_dt, nclust = 3)
+#'
+#' assign_dt = make_assign_dt(clust_dt)
+#' assign_dt
+#'
+make_assign_dt = function(clust_dt, cluster_var = "cluster_id", id_var = "id"){
+  assign_dt = unique(clust_dt[, .(get(cluster_var), get(id_var))])
+  setnames(assign_dt, c(cluster_var, id_var))
+  assign_dt
+}
 
 #' make_feature_as_signal_dt
 #'
@@ -171,6 +201,7 @@ make_dt = function(files, group_lev = NULL, max_name_len = 30){
 #' @param fastq_names optional parallel vector of names for fastq files. Defaults to basename of fastq_files. Should be unique.
 #' @param fastq_treatments optional parallel vector of treatments. Defaults to fastq_names. May be duplicated.
 #' @param n_cores number of cores to use to count lines in fastq files. Defaults to mc.cores if set or 1.
+#' @param cache_counts logical. Should the counts be saved to *.cnt files alongside the fastq_files?  Default is TRUE
 #'
 #' @return a data.table countaining fastq, count, name, and treatment attributes
 #' @export
@@ -240,8 +271,10 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
 #'   labs(title = "After centering")
 #'
 #' #bam example with 1 bam, query_dt can just be file paths
-#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#' peak_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bed$", full.names = TRUE)
+#' bam_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
 #' query_gr2 = easyLoad_bed(peak_file)[[1]]
 #' set.seed(0)
@@ -311,8 +344,10 @@ make_centered_query_gr = function(query_dt, query_gr, view_size = NULL, n_cores 
 #' @export
 #'
 #' @examples
-#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#' peak_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bed$", full.names = TRUE)
+#' bam_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
 #' query_gr = easyLoad_bed(peak_file)[[1]]
 #'
@@ -408,8 +443,10 @@ make_peak_dt = function(peak_grs, treatments = NULL){
 #' @export
 #'
 #' @examples
-#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#' peak_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bed$", full.names = TRUE)
+#' bam_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
 #' query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 #' query_dt = data.table(file = rep(bam_file, 2))
@@ -489,10 +526,13 @@ make_scc_dt = function(query_dt,
 #'
 #' @return list fo tidy data.table of SCC data for bam_file
 #'
+#' @import tools digest
 #'
 #' @examples
-#' peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-#' bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+#' peak_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bed$", full.names = TRUE)
+#' bam_file = dir(system.file("extdata", package = "seqqc"),
+#'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
 #' query_gr = easyLoad_bed(peak_file)[[1]]
 #'

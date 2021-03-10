@@ -42,8 +42,10 @@ list fo tidy data.table of SCC data for every bam file in query_dt
 Calculate Strand Cross Correlation (SCC) for several bam files defined in query_dt at regions defined by query_gr and return tidy data.table.
 }
 \examples{
-peak_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bed$", full.names = TRUE)
-bam_file = dir(system.file("extdata", package = "seqqc"), pattern = "test_peaks.bam$", full.names = TRUE)
+peak_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bed$", full.names = TRUE)
+bam_file = dir(system.file("extdata", package = "seqqc"),
+  pattern = "test_peaks.bam$", full.names = TRUE)
 
 query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 query_dt = data.table(file = rep(bam_file, 2))

@@ -20,6 +20,8 @@ make_fq_dt(
 \item{fastq_treatments}{optional parallel vector of treatments. Defaults to fastq_names. May be duplicated.}
 
 \item{n_cores}{number of cores to use to count lines in fastq files. Defaults to mc.cores if set or 1.}
+
+\item{cache_counts}{logical. Should the counts be saved to *.cnt files alongside the fastq_files?  Default is TRUE}
 }
 \value{
 a data.table countaining fastq, count, name, and treatment attributes
