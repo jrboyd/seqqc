@@ -135,8 +135,8 @@ make_feature_as_signal_dt = function(anno_grs, query_gr){
 #' dt2$batch
 make_dt = function(files, group_lev = NULL, max_name_len = 30){
   p_dt = data.table(file = files)
-  p_dt[, name := sub("\\..+", "", basename(file))]
-  p_dt[, name := sub("(?<=rep[0-9])_.+", "", name, perl = TRUE)]
+  p_dt[, sample := sub("\\..+", "", basename(file))]
+  p_dt[, sample := sub("(?<=rep[0-9])_.+", "", sample, perl = TRUE)]
 
   p_dt[, file_dir := file]
 
@@ -155,7 +155,7 @@ make_dt = function(files, group_lev = NULL, max_name_len = 30){
     p_dt$group = factor(p_dt$group, levels = group_lev)
     p_dt[, batch := LETTERS[as.numeric(group)]]
   }
-  p_dt[, name := paste0(substr(name, 0, max_name_len), ".", batch)]
+  p_dt[, name := paste0(substr(sample, 0, max_name_len), ".", batch)]
   dupe_num = 1
   if(any(duplicated(p_dt$name))){
     p_dt[, dupe_num := seq(.N)-1, .(name)]

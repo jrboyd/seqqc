@@ -7,9 +7,10 @@
 plot_signals(
   prof_dt,
   query_gr,
-  anno_dt = NULL,
+  anno_grs = NULL,
   frip_dt = NULL,
-  name_lev = NULL
+  name_lev = NULL,
+  nclust = 6
 )
 }
 \arguments{
@@ -17,11 +18,13 @@ plot_signals(
 
 \item{query_gr}{The GRanges used to produce prof_dt.}
 
-\item{anno_dt}{(optional) output from \code{\link{make_anno_dt}}}
+\item{anno_grs}{(optional) output from \code{\link{make_anno_grs}}}
 
 \item{frip_dt}{(optional) output from \code{\link{make_frip_dt}}}
 
 \item{name_lev}{(optional) manual specification for levels of "name" to control ordering.}
+
+\item{nclust}{Number of clusters for heatmap. Defaults to 6.}
 }
 \value{
 named list of ggplot plots and relevant data
@@ -30,19 +33,37 @@ named list of ggplot plots and relevant data
 Performs clustering on signal profiles in prof_dt and produces various plots
 }
 \examples{
-bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "bw$", full.names = TRUE)
+bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
 query_dt = make_dt(bw_files)
 query_dt[, sample := sub("_FE_random100.A", "", name)]
 
 peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-peak_grs = easyLoad_narrowPeak(peak_files)
-query_gr = resize(ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
-anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
 
-prof_dt = ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
+prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
 
 sig_res = plot_signals(prof_dt, query_gr)
 sig_res$heatmap
+sig_res$heatmap_sidebar
 
-sig_res.anno = plot_signals(prof_dt, query_gr, anno_dt = anno_dt)
+gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
+anno_grs = make_anno_grs(gtf_file)
+
+sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+sig_res.anno$heatmap
+sig_res.anno$heatmap_feature_overlap
+
+bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+query_dt.bam = make_dt(bam_files)
+frip_dt = make_frip_dt(query_dt.bam, query_gr)
+
+scc_dt = make_scc_dt(query_dt.bam, query_gr)
+ggplot(scc_dt$average_correlation, aes(x = shift, y = correlation, color = sample)) + geom_path()
+
+sig_res.frip = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+sig_res.frip$heatmap
+sig_res.frip$heatmap_cluster_frip
+
+plot_signals(prof_dt, query_gr, anno_grs = anno_grs, )
 }

@@ -16,8 +16,28 @@ write_bed_frip(query_gr, assign_dt, frip_dt, file = "regions_with_FRIP.txt")
 \item{file}{File to write to}
 }
 \value{
-
+invisibly returns data that is written to file
 }
 \description{
 write_bed_frip
+}
+\examples{
+bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
+query_dt = make_dt(bw_files)
+query_dt[, sample := sub("_FE_random100.A", "", name)]
+
+peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
+
+prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
+
+bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+query_dt.bam = make_dt(bam_files)
+frip_dt = make_frip_dt(query_dt.bam, query_gr)
+
+sig_res = plot_signals(prof_dt, query_gr)
+
+assign_dt = sig_res$cluster_assignment
+write_bed_frip(query_gr, assign_dt, frip_dt)
 }

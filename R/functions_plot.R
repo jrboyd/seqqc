@@ -232,30 +232,49 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
 #'
 #' @param prof_dt data.table of signal profiles from \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}.
 #' @param query_gr The GRanges used to produce prof_dt.
-#' @param anno_dt (optional) output from \code{\link{make_anno_dt}}
+#' @param anno_grs (optional) output from \code{\link{make_anno_grs}}
 #' @param frip_dt (optional) output from \code{\link{make_frip_dt}}
 #' @param name_lev (optional) manual specification for levels of "name" to control ordering.
+#' @param nclust Number of clusters for heatmap. Defaults to 6.
 #'
 #' @return named list of ggplot plots and relevant data
 #' @export
 #'
 #' @examples
-#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "bw$", full.names = TRUE)
+#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
 #' query_dt = make_dt(bw_files)
 #' query_dt[, sample := sub("_FE_random100.A", "", name)]
 #'
 #' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-#' peak_grs = easyLoad_narrowPeak(peak_files)
-#' query_gr = resize(ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
-#' anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+#' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
 #'
-#' prof_dt = ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
+#' prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
 #'
 #' sig_res = plot_signals(prof_dt, query_gr)
 #' sig_res$heatmap
+#' sig_res$heatmap_sidebar
 #'
-#' sig_res.anno = plot_signals(prof_dt, query_gr, anno_dt = anno_dt)
-plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_lev = NULL){
+#' gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
+#' anno_grs = make_anno_grs(gtf_file)
+#'
+#' sig_res.anno = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+#' sig_res.anno$heatmap
+#' sig_res.anno$heatmap_feature_overlap
+#'
+#' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+#' query_dt.bam = make_dt(bam_files)
+#' frip_dt = make_frip_dt(query_dt.bam, query_gr)
+#'
+#' scc_dt = make_scc_dt(query_dt.bam, query_gr)
+#' ggplot(scc_dt$average_correlation, aes(x = shift, y = correlation, color = sample)) + geom_path()
+#'
+#' sig_res.frip = plot_signals(prof_dt, query_gr, anno_grs = anno_grs, frip_dt = frip_dt)
+#' sig_res.frip$heatmap
+#' sig_res.frip$heatmap_cluster_frip
+#'
+#' plot_signals(prof_dt, query_gr, anno_grs = anno_grs, )
+plot_signals = function(prof_dt, query_gr, anno_grs = NULL, frip_dt = NULL, name_lev = NULL, nclust = 6){
   if(is.null(prof_dt$name)){
     prof_dt$name = prof_dt$sample
   }
@@ -276,25 +295,55 @@ plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_
   prof_dt[, y_relative := y / max(y), .(id)]
 
   set.seed(0)
-  clust_dt = ssvSignalClustering(prof_dt, fill_ = "y_relative", max_cols = Inf, facet_ = "facet", max_rows = Inf)
+  clust_dt = ssvSignalClustering(prof_dt, fill_ = "y_relative", max_cols = Inf, facet_ = "facet", max_rows = Inf, nclust = nclust)
   assign_dt = unique(clust_dt[, .(id, cluster_id)])
   toplot_id = ssvRecipes::sampleCap(unique(clust_dt$id), 500)
+
+  x_vals = unique(prof_dt$x)
+  view_size = diff(range(x_vals)) + abs(x_vals[2] - x_vals[1])
+
   p_heat = ssvSignalHeatmap(clust_dt[id %in% toplot_id],
                             fill_ = "y_relative",
                             max_cols = Inf,
                             facet_ = "facet", show_cluster_bars = FALSE)
-  x_vals = unique(prof_dt$x)
-  view_size = diff(range(x_vals)) + abs(x_vals[2] - x_vals[1])
+
+  p_heat_sb = ssvSignalHeatmap.ClusterBars(clust_dt[id %in% toplot_id],
+                               fill_ = "y_relative",
+                               max_cols = Inf,
+                               facet_ = "facet", show_cluster_bars = FALSE, return_unassembled_plots = TRUE)
+  p_heat_sb$heatmap = p_heat_sb$heatmap +
+    labs(x = paste(view_size, "bp view size"), fill = "relative pileup") +
+    theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "bottom")
+
+  p_heat_sb_assembled = seqsetvis::assemble_heatmap_cluster_bars(p_heat_sb, rel_widths = c(1, 9))
+
+
   p_heat = p_heat +
     labs(x = paste(view_size, "bp view size"), fill = "relative pileup") +
     theme(axis.text.x = element_blank(), axis.ticks.x = element_blank(), legend.position = "bottom")
 
-  if(is.null(anno_dt)){
-    p_clust_boxes = ggplot() + theme_void() + labs(title = "anno_dt not provided")
-    p_heat_anno = ggplot() + theme_void() + labs(title = "anno_dt not provided")
+  clust_sizes = unique(clust_dt[, .(cluster_id, id)])[, .N, .(cluster_id)][rev(order(cluster_id))]
+  clust_sizes[, xmin := 0]
+  clust_sizes[, xmax := 1]
+  clust_sizes[, ymin := c(0, cumsum(N)[-length(N)])]
+  clust_sizes[, ymax := cumsum(N)]
+  clust_sizes[, col := as.character(as.numeric(cluster_id)%%2)]
+  clust_sizes$facet = ""
+  p_clust_boxes = ggplot(clust_sizes, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax)) +
+    geom_rect(aes(fill = col), color = "black") +
+    geom_text(aes(label = cluster_id, x = (xmin+xmax)/2, y = (ymin+ymax)/2)) +
+    scale_fill_manual(values = c("0" = "gray70", "1" = 'gray90')) +
+    guides(fill = 'none') +
+    coord_cartesian(expand = FALSE) +
+    theme_void() +
+    facet_grid(~facet)
+
+  if(is.null(anno_grs)){
+    p_heat_anno = ggplot() + theme_void() + labs(title = "anno_grs not provided")
   }else{
+    anno_signal_dt = make_feature_as_signal_dt(anno_grs, query_gr)
     # anno_clust_dt = ssvFetchGRanges(anno_grs, resize(query_gr[toplot_id], view_size, fix = "center"), return_data.table = TRUE)
-    anno_clust_dt = anno_dt[id %in% toplot_id]
+    anno_clust_dt = anno_signal_dt[id %in% toplot_id]
     anno_clust_dt$id = factor(anno_clust_dt$id, levels = levels(clust_dt$id))
     anno_clust_dt$sample = factor(anno_clust_dt$sample, levels = rev(names(anno_grs)))
     p_heat_anno = ggplot(anno_clust_dt, aes(x = x, y = id, fill = y>0)) +
@@ -303,25 +352,9 @@ plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
       scale_fill_manual(values = c("FALSE" = "gray80", "TRUE" = "gray20")) +
       scale_x_continuous(labels = function(x)x/1e3) +
-      labs(fill = "feature overlap", x= "kbp", y = "peak region")
-
-    clust_sizes = unique(clust_dt[, .(cluster_id, id)])[, .N, .(cluster_id)][rev(order(cluster_id))]
-    clust_sizes[, xmin := 0]
-    clust_sizes[, xmax := 1]
-    clust_sizes[, ymin := c(0, cumsum(N)[-length(N)])]
-    clust_sizes[, ymax := cumsum(N)]
-    clust_sizes[, col := as.character(as.numeric(cluster_id)%%2)]
-    clust_sizes$facet = ""
-    p_clust_boxes = ggplot(clust_sizes, aes(xmin = xmin, xmax = xmax, ymin = ymin, ymax = ymax)) +
-      geom_rect(aes(fill = col), color = "black") +
-      geom_text(aes(label = cluster_id, x = (xmin+xmax)/2, y = (ymin+ymax)/2)) +
-      scale_fill_manual(values = c("0" = "gray70", "1" = 'gray90')) +
-      guides(fill = 'none') +
-      coord_cartesian(expand = FALSE) +
-      theme_void() +
-      facet_grid(~facet)
+      labs(fill = "feature overlap", x= "kbp", y = "peak region") +
+      theme(panel.background = element_blank(), panel.grid = element_blank())
   }
-
 
   if(is.null(frip_dt)){
     p_fripHeat = ggplot() + theme_void() + labs(title = "frip_dt no provided")
@@ -330,8 +363,8 @@ plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_
     dt.heat = copy(frip_dt)
     assign_dt = unique(clust_dt[, .(id, cluster_id)])
     dt.heat = merge(dt.heat, assign_dt, by = "id")
-    tmp = dt.heat[, .(N = sum(N), mapped_reads = unique(mapped_reads)), .(sample, treatment, name, cluster_id)]
-    tmp[, frip := N / mapped_reads]
+    tmp = dt.heat[, .(reads_in_peak = sum(reads_in_peak), mapped_reads = unique(mapped_reads)), .(sample, treatment, name, cluster_id)]
+    tmp[, frip := reads_in_peak / mapped_reads]
 
     .genome_fraction = function(x){
       sum(width(query_gr[x]))  /3.2e9
@@ -364,17 +397,16 @@ plot_signals = function(prof_dt, query_gr, anno_dt = NULL, frip_dt = NULL, name_
       theme(plot.title = element_text(size = 14, color = "red"), plot.subtitle = element_text(size = 14, color = "blue"))
   }
 
-
-  p_heat_l = ssvRecipes::sync_height(list(p_clust_boxes, p_heat, p_heat_anno))
-  pg_heat_top = cowplot::plot_grid(plotlist = p_heat_l, rel_widths = c(1, length(peak_grs)+2, length(anno_grs)+1), nrow = 1)
-  pg_heat = cowplot::plot_grid(ncol = 1,
-                               pg_heat_top,
-                               cowplot::plot_grid(nrow = 1, p_fripHeat, p_clust_text))
+  # p_heat_l = ssvRecipes::sync_height(list(p_clust_boxes, p_heat, p_heat_anno))
+  # pg_heat_top = cowplot::plot_grid(plotlist = p_heat_l, rel_widths = c(1, length(peak_grs)+2, length(anno_grs)+1), nrow = 1)
+  # pg_heat = cowplot::plot_grid(ncol = 1,
+  #                              pg_heat_top,
+  #                              cowplot::plot_grid(nrow = 1, p_fripHeat, p_clust_text))
 
   return(list(
-    assembled = pg_heat,
+    # assembled = pg_heat,
     heatmap = p_heat,
-    heatmap_sidebar = p_clust_boxes,
+    heatmap_sidebar = p_heat_sb_assembled,
     heatmap_feature_overlap = p_heat_anno,
     heatmap_cluster_frip = p_fripHeat,
     heatmap_text_frip = p_clust_text,
