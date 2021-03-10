@@ -26,18 +26,22 @@
 #' sig_res = plot_signals(prof_dt, query_gr)
 #'
 #' assign_dt = sig_res$cluster_assignment
-#' write_bed_frip(query_gr, assign_dt, frip_dt)
+#'
+#' outdir = system.file("extdata", package = "seqqc")
+#' write_bed_frip(query_gr, assign_dt, frip_dt,
+#'   file = file.path(outdir, "regions_with_FRIP.txt"))
 write_bed_frip = function(query_gr, assign_dt, frip_dt, file = "regions_with_FRIP.txt"){
-  region_frip_dt = dcast(frip_dt[, .(id, name, reads_in_peak, treatment, frip)], id~name, value.var = "frip")
+  id = name = reads_in_peak = treatment = frip = NULL #global binding for data.table
+  region_frip_dt = dcast(frip_dt[, list(id, name, reads_in_peak, treatment, frip)], id~name, value.var = "frip")
   setkey(region_frip_dt, id)
   setkey(assign_dt, id)
   bed_frip_towrite = query_gr
 
-  mcols(bed_frip_towrite) = region_frip_dt[.(names(bed_frip_towrite))]
+  mcols(bed_frip_towrite) = region_frip_dt[list(names(bed_frip_towrite))]
   # bed_frip_towrite$id = NULL
 
   message("write files...")
-  bed_frip_towrite$cluster_id = assign_dt[.(names(bed_frip_towrite))]$cluster_id
+  bed_frip_towrite$cluster_id = assign_dt[list(names(bed_frip_towrite))]$cluster_id
   # rtracklayer::export.bed(bed_frip_towrite, paste0("consensus_regions_with_FRIP.", file_tag, ".bed"))
 
   bed_frip_towrite_dt = as.data.table(bed_frip_towrite)
@@ -74,11 +78,14 @@ write_bed_frip = function(query_gr, assign_dt, frip_dt, file = "regions_with_FRI
 #'
 #' sig_res = plot_signals(prof_dt, query_gr)
 #' assign_dt = sig_res$cluster_assignment
-#' write_bed_overlaps(overlaps_gr, assign_dt)
+#'
+#' outdir = system.file("extdata", package = "seqqc")
+#' write_bed_overlaps(overlaps_gr, assign_dt,
+#'   file = file.path(outdir, "regions_with_overlaps.txt"))
 write_bed_overlaps = function(overlaps_gr, assign_dt, file = "regions_with_overlaps.txt"){
   setkey(assign_dt, id)
   bed_peak_towrite = overlaps_gr
-  bed_peak_towrite$cluster_id = assign_dt[.(names(bed_peak_towrite))]$cluster_id
+  bed_peak_towrite$cluster_id = assign_dt[list(names(bed_peak_towrite))]$cluster_id
   bed_peak_towrite_dt = as.data.table(bed_peak_towrite)
   bed_peak_towrite_dt$id = names(bed_peak_towrite)
   bed_peak_towrite_dt$strand = "."

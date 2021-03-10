@@ -21,13 +21,18 @@ make_scc_dt.single(
 
 \item{query_gr}{GRanges of regions to calculate SCC for}
 
-\item{frag_sizes}{optional numeric. Fragment sizes to calculate correlation at.  The higher the resolution the longer calculation will take.  The default is to count by 10 from 50 to 350.}
+\item{frag_sizes}{optional numeric. Fragment sizes to calculate correlation
+at.  The higher the resolution the longer calculation will take.  The
+default is to count by 10 from 50 to 350.}
 
-\item{fetch_size}{optional numeric. Size in bp centered around each interval in query_gr to retrieve.  Should be greater than max frag_size. The default is 3*max(frag_sizes).}
+\item{fetch_size}{optional numeric. Size in bp centered around each interval
+in query_gr to retrieve.  Should be greater than max frag_size. The default
+is 3*max(frag_sizes).}
 
 \item{cache_path}{path to cache location for BiocFileCache to use.}
 
-\item{cache_version}{Modifying the cache version will force recalulation of all results going forward. Default is v1.}
+\item{cache_version}{Modifying the cache version will force recalulation of
+all results going forward. Default is v1.}
 
 \item{force_overwrite}{Logical, if TRUE, cache contents will be overwritten.}
 

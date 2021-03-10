@@ -15,13 +15,17 @@ make_fq_dt(
 \arguments{
 \item{fastq_files}{paths to fast files (can be gzipped with .gz extension)}
 
-\item{fastq_names}{optional parallel vector of names for fastq files. Defaults to basename of fastq_files. Should be unique.}
+\item{fastq_names}{optional parallel vector of names for fastq files.
+Defaults to basename of fastq_files. Should be unique.}
 
-\item{fastq_treatments}{optional parallel vector of treatments. Defaults to fastq_names. May be duplicated.}
+\item{fastq_treatments}{optional parallel vector of treatments. Defaults to
+fastq_names. May be duplicated.}
 
-\item{n_cores}{number of cores to use to count lines in fastq files. Defaults to mc.cores if set or 1.}
+\item{n_cores}{number of cores to use to count lines in fastq files. Defaults
+to mc.cores if set or 1.}
 
-\item{cache_counts}{logical. Should the counts be saved to *.cnt files alongside the fastq_files?  Default is TRUE}
+\item{cache_counts}{logical. Should the counts be saved to *.cnt files
+alongside the fastq_files?  Default is TRUE}
 }
 \value{
 a data.table countaining fastq, count, name, and treatment attributes

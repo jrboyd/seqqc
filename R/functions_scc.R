@@ -7,7 +7,7 @@ crossCorrByRle = function(bam_file,
                           read_length = NULL,
                           include_plots = TRUE,
                           ...){
-  rn = NULL # reserve for data.table
+  rn = cor = NULL # reserve for data.table
   if(is.null(query_gr$name)){
     if(is.null(names(query_gr))){
       query_gr$name = paste0("peak_", seq_along(query_gr))
@@ -81,14 +81,33 @@ getReadLength = function(bam_file,
   readlength
 }
 
+#' Forces seqlengths in GRanges to be that in header of bam_file
+#'
+#' This is important to avoid errors while using the gr to query the bam_file.
+#'
+#' @param gr GRanges
+#' @param bam_file bam_file
+#'
+#' @return GRanges with seqlengths matching bam_file
+#' @import Rsamtools GenomeInfoDb
+#' @examples
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
+#' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "center")
+#'
+#' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+#'
+#' query_gr.harmonized = seqqc:::harmonize_seqlengths(query_gr, bam_files[1])
+#' seqlengths(query_gr.harmonized)
+#'
 harmonize_seqlengths = function(gr, bam_file){
   chr_lengths = Rsamtools::scanBamHeader(bam_file)[[1]]$targets
-  seqlengths(gr) = chr_lengths[names(seqlengths(gr))]
-  too_long = end(gr) > seqlengths(gr)[as.character(seqnames(gr))]
+  GenomeInfoDb::seqlengths(gr) = chr_lengths[names(GenomeInfoDb::seqlengths(gr))]
+  too_long = end(gr) > GenomeInfoDb::seqlengths(gr)[as.character(seqnames(gr))]
   if(any(too_long)){
     message(sum(too_long), " region shifted for extending beyond seqlengths")
     fix_gr = gr[too_long]
-    shift_by = -(end(fix_gr) - seqlengths(fix_gr)[as.character(seqnames(fix_gr))])
+    shift_by = -(end(fix_gr) - GenomeInfoDb::seqlengths(fix_gr)[as.character(seqnames(fix_gr))])
     gr[too_long] = GenomicRanges::shift(fix_gr, shift_by)
   }
   too_short = start(gr) < 1
@@ -121,16 +140,17 @@ bfcif = function(bfc, rname, FUN, force_overwrite = FALSE){
 }
 
 gather_metrics = function(peak_strand_corr, read_length = NULL){
-  max_dt = peak_strand_corr[, .(shift = shift[which.max(correlation)], correlation = max(correlation)), by = .(id)]
+  correlation = id = NULL
+  max_dt = peak_strand_corr[, list(shift = shift[which.max(correlation)], correlation = max(correlation)), by = list(id)]
   # if(is.null(read_length)){
   #     fl = round(.my_mode(max_dt[shift != min(shift, na.rm = TRUE) & shift != max(shift, na.rm = TRUE)]$shift, na.rm = TRUE))
   # }else{
   #     fl = round(.my_mode(max_dt[shift != read_length][shift != min(shift, na.rm = TRUE) & shift != max(shift, na.rm = TRUE)]$shift, na.rm = TRUE))
   # }
-  flex_frag_corrs = max_dt[, .(shift, id, correlation)]
+  flex_frag_corrs = max_dt[, list(shift, id, correlation)]
 
 
-  average_corr = peak_strand_corr[, .(correlation = mean(correlation)), .(shift)]
+  average_corr = peak_strand_corr[, list(correlation = mean(correlation)), list(shift)]
 
   fl = average_corr[, shift[which.max(correlation)[1]]]
 

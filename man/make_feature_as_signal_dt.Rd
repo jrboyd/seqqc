@@ -7,7 +7,8 @@
 make_feature_as_signal_dt(anno_grs, query_gr)
 }
 \arguments{
-\item{anno_grs}{named list of GRanges objects where each is an annotation class.  Use \code{\link{make_anno_grs}} to generate.}
+\item{anno_grs}{named list of GRanges objects where each is an annotation
+class.  Use \code{\link{make_anno_grs}} to generate.}
 
 \item{query_gr}{GRanges of regions to characterize via anno_grs.}
 }
@@ -15,7 +16,8 @@ make_feature_as_signal_dt(anno_grs, query_gr)
 a data.table of counts for each annotation class.
 }
 \description{
-Create a data.table of overlaps between query_gr and anno_grs (from \code{\link{make_anno_grs}} )
+Create a data.table of overlaps between query_gr and anno_grs (from
+\code{\link{make_anno_grs}} )
 }
 \examples{
 gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_peaks.gtf")
@@ -23,7 +25,7 @@ anno_grs = make_anno_grs(gtf_file)
 
 peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
 peak_grs = easyLoad_narrowPeak(peak_files)
-query_gr = resize(ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
+query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
 anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
 anno_dt$id = factor(anno_dt$id, levels = rev(unique(anno_dt$id)))
 ggplot(anno_dt, aes(x = x, fill = y, y = id)) + geom_tile() + facet_wrap(~sample)

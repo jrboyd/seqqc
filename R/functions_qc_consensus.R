@@ -71,7 +71,7 @@ if(FALSE){
 
     qdt_peaks = make_dt(peak_files, group_lev = c("MCF10A_rep1_001", "MCF10A_rep2"))
     peaks_frip = easyLoad_narrowPeak(qdt_peaks$file, file_names = qdt_peaks$name)
-    qgr_frip = ssvConsensusIntervalSets(peaks_frip)
+    qgr_frip = seqsetvis::ssvConsensusIntervalSets(peaks_frip)
 
     frip_dt = make_frip_dt(qdt_frip, qgr_frip, is_PE = FALSE)
     peak_dt = make_peak_dt(peaks_frip)
@@ -90,7 +90,7 @@ if(FALSE){
 
     sel_qgr = sample(qgr_frip, 100)
 
-    prof_dt = ssvFetchBam(qdt_frip, sel_qgr, fragLens = 210, return_data.table = TRUE)
+    prof_dt = seqsetvis::ssvFetchBam(qdt_frip, sel_qgr, fragLens = 210, return_data.table = TRUE)
     anno_dt = make_anno_dt(anno_grs, qgr_frip)
 
     singal_plots = plot_signals(prof_dt, sel_qgr, frip_dt = frip_dt, anno_dt = anno_dt)

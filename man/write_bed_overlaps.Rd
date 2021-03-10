@@ -33,5 +33,8 @@ prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE
 
 sig_res = plot_signals(prof_dt, query_gr)
 assign_dt = sig_res$cluster_assignment
-write_bed_overlaps(overlaps_gr, assign_dt)
+
+outdir = system.file("extdata", package = "seqqc")
+write_bed_overlaps(overlaps_gr, assign_dt,
+  file = file.path(outdir, "regions_with_overlaps.txt"))
 }

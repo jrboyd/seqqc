@@ -18,15 +18,19 @@ plot_signals(
 )
 }
 \arguments{
-\item{prof_dt}{data.table of signal profiles from \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}.}
+\item{prof_dt}{data.table of signal profiles from
+\link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}.}
 
 \item{query_gr}{The GRanges used to produce prof_dt.}
 
-\item{assign_dt}{(optional) Precalculated clustering.  From running \link[seqsetvis]{ssvSignalClustering} followed by \code{\link{make_assign_dt}}}
+\item{assign_dt}{(optional) Precalculated clustering.  From running
+\link[seqsetvis]{ssvSignalClustering} followed by
+\code{\link{make_assign_dt}}}
 
 \item{n_to_plot}{numeric. Number of items plotted in heatmap.  Default is 500.}
 
-\item{fill_var}{character. Variable in prof_dt to cluster and plot on. Default of y_relative is the fraction of max y per id.}
+\item{fill_var}{character. Variable in prof_dt to cluster and plot on. Default
+of y_relative is the fraction of max y per id.}
 
 \item{anno_grs}{(optional) output from \code{\link{make_anno_grs}}}
 
@@ -34,7 +38,8 @@ plot_signals(
 
 \item{scc_dt}{(optional) output from \code{\link{make_scc_dt}}}
 
-\item{name_lev}{(optional) manual specification for levels of "name" to control ordering.}
+\item{name_lev}{(optional) manual specification for levels of "name" to
+control ordering.}
 
 \item{nclust}{Number of clusters for heatmap. Defaults to 6.}
 }
@@ -42,7 +47,9 @@ plot_signals(
 named list of ggplot plots and relevant data
 }
 \description{
-Performs clustering on signal profiles in prof_dt and produces various plots. Optionally outputs annotation (with anno_grs) and/or FRIP (with frip_dt) plots that incorporate signal clustering information.
+Performs clustering on signal profiles in prof_dt and produces various plots.
+Optionally outputs annotation (with anno_grs) and/or FRIP (with frip_dt) plots
+that incorporate signal clustering information.
 }
 \examples{
 bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)

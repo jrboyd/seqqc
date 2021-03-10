@@ -7,13 +7,16 @@
 make_anno_grs(gtf_file)
 }
 \arguments{
-\item{gtf_file}{A gtf or gtf.gz file from GENCODE  Other sources may work but have not been tested.}
+\item{gtf_file}{A gtf or gtf.gz file from GENCODE  Other sources may work but
+have not been tested.}
 }
 \value{
-a named list of GRanges where each corresponds to an annotated feature type
+a named list of GRanges where each corresponds to an annotated
+  feature type
 }
 \description{
-Loads a GTF file and processes it to list of GRanges suitable for serial annotation by \code{\link{make_feature_as_signal_dt}}.
+Loads a GTF file and processes it to list of GRanges suitable for serial
+annotation by \code{\link{make_feature_as_signal_dt}}.
 }
 \details{
 Output is intended for use with \code{\link{make_feature_as_signal_dt}}

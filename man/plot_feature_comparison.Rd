@@ -14,14 +14,19 @@ plot_feature_comparison(
 \arguments{
 \item{peak_grs}{list of GRanges peak sets}
 
-\item{min_fraction}{numeric fraction from 0 to 1. min_fraction of peaks for consensus. Default is 0.}
+\item{min_fraction}{numeric fraction from 0 to 1. min_fraction of peaks for
+consensus. Default is 0.}
 
-\item{min_number}{numeric from 2 to length of peak_gres. min_number of peaks for consesensus. default is 2.}
+\item{min_number}{numeric from 2 to length of peak_gres. min_number of peaks
+for consesensus. default is 2.}
 
-\item{force_euler}{logical. If TRUE, Euler plots will generate for more than 8 peak sets, may be very slow! Default is FALSE}
+\item{force_euler}{logical. If TRUE, Euler plots will generate for more than
+8 peak sets, may be very slow! Default is FALSE}
 }
 \value{
-Nested list of plots for peak overlaps. Outer list contains "all" and "consensus" sets of plots.  Inner list has a barplot, binary heatmap and upset
+Nested list of plots for peak overlaps. Outer list contains "all" and
+  "consensus" sets of plots.  Inner list has a barplot, binary heatmap and
+  upset
 }
 \description{
 plot_feature_comparison

@@ -17,17 +17,23 @@ make_scc_dt(
 )
 }
 \arguments{
-\item{query_dt}{data.table with query information. Only really needs file as first column.}
+\item{query_dt}{data.table with query information. Only really needs file as
+first column.}
 
 \item{query_gr}{GRanges of regions to calculate SCC for}
 
-\item{frag_sizes}{optional numeric. Fragment sizes to calculate correlation at.  The higher the resolution the longer calculation will take.  The default is to count by 10 from 50 to 350.}
+\item{frag_sizes}{optional numeric. Fragment sizes to calculate correlation
+at.  The higher the resolution the longer calculation will take.  The
+default is to count by 10 from 50 to 350.}
 
-\item{fetch_size}{optional numeric. Size in bp centered around each interval in query_gr to retrieve.  Should be greater than max frag_size. The default is 3*max(frag_sizes).}
+\item{fetch_size}{optional numeric. Size in bp centered around each interval
+in query_gr to retrieve.  Should be greater than max frag_size. The default
+is 3*max(frag_sizes).}
 
 \item{cache_path}{path to cache location for BiocFileCache to use.}
 
-\item{cache_version}{Modifying the cache version will force recalulation of all results going forward. Default is v1.}
+\item{cache_version}{Modifying the cache version will force recalulation of
+all results going forward. Default is v1.}
 
 \item{force_overwrite}{Logical, if TRUE, cache contents will be overwritten.}
 
@@ -39,7 +45,8 @@ make_scc_dt(
 list fo tidy data.table of SCC data for every bam file in query_dt
 }
 \description{
-Calculate Strand Cross Correlation (SCC) for several bam files defined in query_dt at regions defined by query_gr and return tidy data.table.
+Calculate Strand Cross Correlation (SCC) for several bam files defined in
+query_dt at regions defined by query_gr and return tidy data.table.
 }
 \examples{
 peak_file = dir(system.file("extdata", package = "seqqc"),

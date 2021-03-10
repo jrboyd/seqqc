@@ -20,11 +20,15 @@ plot_frip_dt(
 
 \item{fq_dt}{(optional) output from \code{\link{make_fq_dt}}}
 
-\item{query_gr}{(optional) The GRanges used to create frip_dt, only necessary to calculate the fraction of genome covered by peaks.}
+\item{query_gr}{(optional) The GRanges used to create frip_dt, only necessary
+to calculate the fraction of genome covered by peaks.}
 
-\item{sort_by}{character. One of "frip" or "reads_in_peak". Should plots be sorted by decreasing FRIP ("frip") or total reads ("reads_in_peak")? Default is "frip".}
+\item{sort_by}{character. One of "frip" or "reads_in_peak". Should plots be
+sorted by decreasing FRIP ("frip") or total reads ("reads_in_peak")?
+Default is "frip".}
 
-\item{name_lev}{character. Name levels to impose manual ordering.  sort_by is not ignored if this is not NULL. Default is NULL.}
+\item{name_lev}{character. Name levels to impose manual ordering.  sort_by is
+not ignored if this is not NULL. Default is NULL.}
 }
 \value{
 list of ggplot plots relevant to FRIP.

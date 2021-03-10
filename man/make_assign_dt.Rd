@@ -30,7 +30,7 @@ query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 6e2, fix = "cente
 
 prof_dt = seqsetvis::ssvFetchBigwig(query_dt, query_gr, return_data.table = TRUE)
 
-clust_dt = ssvSignalClustering(prof_dt, nclust = 3)
+clust_dt = seqsetvis::ssvSignalClustering(prof_dt, nclust = 3)
 
 assign_dt = make_assign_dt(clust_dt)
 assign_dt

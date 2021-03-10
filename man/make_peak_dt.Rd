@@ -18,8 +18,9 @@ a data.table with peak_count data for each GRanges in peak_grs.
 make_peak_dt
 }
 \examples{
-peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-peak_grs = easyLoad_narrowPeak(peak_files)
+peak_files = dir(system.file("extdata", package = "seqqc"),
+  pattern = "Peak$", full.names = TRUE)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
 
 make_peak_dt(peak_grs)
 }
