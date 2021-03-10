@@ -33,6 +33,7 @@ Returns version of query_gr GRanges centered on the maximum signal in
 bams/bigwigs supplied by query_dt.
 }
 \examples{
+library(seqsetvis)
 #bigwig example with 3 bigwigs
 bw_files = dir(system.file("extdata", package = "seqqc"),
   pattern = "bw$", full.names = TRUE)
@@ -42,18 +43,18 @@ query_dt[, sample := sub("_FE_random100.A", "", name)]
 peak_files = dir(system.file("extdata", package = "seqqc"),
   pattern = "Peak$", full.names = TRUE)
 peak_grs = easyLoad_narrowPeak(peak_files)
-query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 700, fix = "center")
+query_gr = resize(ssvOverlapIntervalSets(peak_grs), 700, fix = "center")
 
 
 
 #heatmap before centering
 set.seed(0)
-seqsetvis::ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr), nclust = 4) +
+ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr), nclust = 4) +
   labs(title = "Before centering")
 
 query_gr.centered = make_centered_query_gr(query_dt, query_gr)
 set.seed(0)
-seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBigwig(query_dt, query_gr.centered), nclust = 4)+
+ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr.centered), nclust = 4)+
   labs(title = "After centering")
 
 #bam example with 1 bam, query_dt can just be file paths
@@ -64,11 +65,11 @@ bam_file = dir(system.file("extdata", package = "seqqc"),
 
 query_gr2 = easyLoad_bed(peak_file)[[1]]
 set.seed(0)
-seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBam(bam_file, query_gr2), nclust = 4) +
+ssvSignalHeatmap(ssvFetchBam(bam_file, query_gr2), nclust = 4) +
   labs(title = "Before centering")
 
 query_gr2.centered = make_centered_query_gr(bam_file, query_gr2, fragLens = 180)
 set.seed(0)
-seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBam(bam_file, query_gr2.centered), nclust = 4) +
+ssvSignalHeatmap(ssvFetchBam(bam_file, query_gr2.centered), nclust = 4) +
   labs(title = "After centering")
 }

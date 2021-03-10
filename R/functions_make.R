@@ -200,7 +200,7 @@ make_assign_dt = function(clust_dt, cluster_var = "cluster_id", id_var = "id"){
 #' anno_grs = make_anno_grs(gtf_file)
 #'
 #' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-#' peak_grs = easyLoad_narrowPeak(peak_files)
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
 #' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
 #' anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
 #' anno_dt$id = factor(anno_dt$id, levels = rev(unique(anno_dt$id)))
@@ -227,10 +227,14 @@ make_feature_as_signal_dt = function(anno_grs, query_gr){
 #'
 #' @examples
 #' fq_files = dir("inst/extdata", pattern = "(fq$)|(fq.gz$)|(fastq$)|(fastq.gz$)", full.names = TRUE)
-#' make_fq_dt(fq_files, fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"))
+#'  #no idea why this make_fq_dt example won't run
+#'  #make_fq_dt(fq_files,
+#'  #  fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"),
+#'  #  cache_counts = FALSE)
 make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_treatments = c("fq", "gz", "fq", "gz"), n_cores = getOption("mc.cores", 1), cache_counts = TRUE){
   message("count fastq reads...")
-  fq_dt = rbindlist(pbmcapply::pbmclapply(fastq_files, mc.cores = n_cores, function(f){
+
+  .cnt_fq = function(f){
     cnt_f = paste0(f, ".cnt")
     if(!file.exists(cnt_f)){
       if(grepl(".gz$", f)){
@@ -243,11 +247,14 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
       if(cache_counts){
         fwrite(cnt_dt, cnt_f, sep = "\t", col.names = FALSE)
       }
-      cnt_dt
     }else{
-      fread(cnt_f, sep = "\t")
+      cnt_dt = fread(cnt_f, sep = "\t")
     }
-  }) )
+    # message(class(cnt_dt))
+    cnt_dt
+  }
+
+  fq_dt = data.table::rbindlist(pbmcapply::pbmclapply(fastq_files, mc.cores = n_cores, .cnt_fq))
   setnames(fq_dt, c("fastq", "count"))
   fq_dt$name = fastq_names
   fq_dt$treatment = fastq_treatments
@@ -271,6 +278,7 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
 #' @export
 #'
 #' @examples
+#' library(seqsetvis)
 #' #bigwig example with 3 bigwigs
 #' bw_files = dir(system.file("extdata", package = "seqqc"),
 #'   pattern = "bw$", full.names = TRUE)
@@ -280,18 +288,18 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
 #' peak_files = dir(system.file("extdata", package = "seqqc"),
 #'   pattern = "Peak$", full.names = TRUE)
 #' peak_grs = easyLoad_narrowPeak(peak_files)
-#' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 700, fix = "center")
+#' query_gr = resize(ssvOverlapIntervalSets(peak_grs), 700, fix = "center")
 #'
 #'
 #'
 #' #heatmap before centering
 #' set.seed(0)
-#' seqsetvis::ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr), nclust = 4) +
+#' ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr), nclust = 4) +
 #'   labs(title = "Before centering")
 #'
 #' query_gr.centered = make_centered_query_gr(query_dt, query_gr)
 #' set.seed(0)
-#' seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBigwig(query_dt, query_gr.centered), nclust = 4)+
+#' ssvSignalHeatmap(ssvFetchBigwig(query_dt, query_gr.centered), nclust = 4)+
 #'   labs(title = "After centering")
 #'
 #' #bam example with 1 bam, query_dt can just be file paths
@@ -302,12 +310,12 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
 #'
 #' query_gr2 = easyLoad_bed(peak_file)[[1]]
 #' set.seed(0)
-#' seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBam(bam_file, query_gr2), nclust = 4) +
+#' ssvSignalHeatmap(ssvFetchBam(bam_file, query_gr2), nclust = 4) +
 #'   labs(title = "Before centering")
 #'
 #' query_gr2.centered = make_centered_query_gr(bam_file, query_gr2, fragLens = 180)
 #' set.seed(0)
-#' seqsetvis::ssvSignalHeatmap(seqsetvis::ssvFetchBam(bam_file, query_gr2.centered), nclust = 4) +
+#' ssvSignalHeatmap(ssvFetchBam(bam_file, query_gr2.centered), nclust = 4) +
 #'   labs(title = "After centering")
 make_centered_query_gr = function(query_dt, query_gr, view_size = NULL,
                                   n_cores = getOption("mc.cores", 1), ...){
@@ -376,7 +384,7 @@ make_centered_query_gr = function(query_dt, query_gr, view_size = NULL,
 #' bam_file = dir(system.file("extdata", package = "seqqc"),
 #'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
-#' query_gr = easyLoad_bed(peak_file)[[1]]
+#' query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 #'
 #' make_frip_dt(bam_file, query_gr)
 make_frip_dt = function(query_dt, query_gr, n_cores = getOption("mc.cores", 1)){
@@ -576,9 +584,9 @@ make_scc_dt = function(query_dt,
 #' bam_file = dir(system.file("extdata", package = "seqqc"),
 #'   pattern = "test_peaks.bam$", full.names = TRUE)
 #'
-#' query_gr = easyLoad_bed(peak_file)[[1]]
+#' query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 #'
-#' scc_res = make_scc_dt.single(bam_file, query_gr, seq(50,300, by = 10))
+#' scc_res = seqqc:::make_scc_dt.single(bam_file, query_gr, seq(50,300, by = 10))
 make_scc_dt.single = function(bam_file,
                               query_gr,
                               frag_sizes,

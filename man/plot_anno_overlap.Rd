@@ -22,7 +22,7 @@ gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_pea
 anno_grs = make_anno_grs(gtf_file)
 
 peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-peak_grs = easyLoad_narrowPeak(peak_files)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
 names(peak_grs) = sub("_rand.+", "", names(peak_grs))
 
 anno_dt = make_anno_dt(peak_grs, anno_grs)

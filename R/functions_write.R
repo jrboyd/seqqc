@@ -83,6 +83,7 @@ write_bed_frip = function(query_gr, assign_dt, frip_dt, file = "regions_with_FRI
 #' write_bed_overlaps(overlaps_gr, assign_dt,
 #'   file = file.path(outdir, "regions_with_overlaps.txt"))
 write_bed_overlaps = function(overlaps_gr, assign_dt, file = "regions_with_overlaps.txt"){
+  id = NULL #global binding for data.table
   setkey(assign_dt, id)
   bed_peak_towrite = overlaps_gr
   bed_peak_towrite$cluster_id = assign_dt[list(names(bed_peak_towrite))]$cluster_id

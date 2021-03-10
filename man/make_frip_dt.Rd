@@ -28,7 +28,7 @@ peak_file = dir(system.file("extdata", package = "seqqc"),
 bam_file = dir(system.file("extdata", package = "seqqc"),
   pattern = "test_peaks.bam$", full.names = TRUE)
 
-query_gr = easyLoad_bed(peak_file)[[1]]
+query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 
 make_frip_dt(bam_file, query_gr)
 }

@@ -52,7 +52,7 @@ peak_file = dir(system.file("extdata", package = "seqqc"),
 bam_file = dir(system.file("extdata", package = "seqqc"),
   pattern = "test_peaks.bam$", full.names = TRUE)
 
-query_gr = easyLoad_bed(peak_file)[[1]]
+query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 
-scc_res = make_scc_dt.single(bam_file, query_gr, seq(50,300, by = 10))
+scc_res = seqqc:::make_scc_dt.single(bam_file, query_gr, seq(50,300, by = 10))
 }

@@ -24,7 +24,7 @@ gtf_file = system.file(package = "seqqc", "extdata/gencode.v35.annotation.at_pea
 anno_grs = make_anno_grs(gtf_file)
 
 peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
-peak_grs = easyLoad_narrowPeak(peak_files)
+peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
 query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
 anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
 anno_dt$id = factor(anno_dt$id, levels = rev(unique(anno_dt$id)))
