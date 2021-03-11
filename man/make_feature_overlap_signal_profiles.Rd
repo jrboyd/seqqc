@@ -33,7 +33,7 @@ make_feature_overlap_signal_profiles(
 
 \item{discard_group_below}{Groups smaller than this will be discarded entirely. Default is 1.}
 
-\item{...}{}
+\item{...}{Passed to \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig} as appropriate to file type.}
 }
 \value{
 A profile data.table with overlap grouping information add and independent ranking added to each group.

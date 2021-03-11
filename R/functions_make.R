@@ -669,7 +669,7 @@ make_scc_dt.single = function(bam_file,
 #' @param min_group_size Groups smaller than this are allowed but larger groups won't be shrunk below this length. Default is 50.
 #' @param max_group_size Even if the smallest group is larger than this, no group will exceed this size. Default is 500.
 #' @param discard_group_below Groups smaller than this will be discarded entirely. Default is 1.
-#' @param ...
+#' @param ... Passed to \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig} as appropriate to file type.
 #'
 #' @return A profile data.table with overlap grouping information add and independent ranking added to each group.
 #' @export
@@ -696,6 +696,7 @@ make_feature_overlap_signal_profiles = function(query_dt,
                                                 max_group_size = 500,
                                                 discard_group_below = 1,
                                                 ...){
+  y = rnk_ = id = NULL #global binding for data.table
   if(is.character(query_dt)) query_dt = data.table(file = query_dt)
   if(is.null(view_size)) view_size = median(width(overlaps_gr))
 
@@ -729,10 +730,10 @@ make_feature_overlap_signal_profiles = function(query_dt,
     })
 
     prof_dt = rbindlist(prof_dt_l, idcol = group_var)
-    rnk_dt = prof_dt[, .(y = max(y)), c("id", group_var)]
+    rnk_dt = prof_dt[, list(y = max(y)), c("id", group_var)]
     rnk_dt[, rnk_ := frank(-y, ties.method = "first"), c(group_var)]
-    prof_dt = merge(prof_dt, rnk_dt[, .(id, rnk_)], by = "id")
-    setnames(prof_dt, "rnk_", rank_vars)
+    prof_dt = merge(prof_dt, rnk_dt[, list(id, rnk_)], by = "id")
+    setnames(prof_dt, "rnk_", rank_var)
 
     prof_dt$name = factor(prof_dt$name)
     prof_dt$name = factor(prof_dt$name, levels = levels(prof_dt$name)[c(4:5, 2:3, 1)])
