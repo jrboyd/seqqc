@@ -124,8 +124,8 @@ make_anno_dt =  function(peak_grs, anno_grs, name_lev = NULL){
   .apply_annotation = function(x){
     x$anno = "intergenic"
     for(i in seq_along(anno_grs)){
-      olaps = findOverlaps(x, anno_grs[[i]])
-      x$anno[S4Vectors::queryHits(olaps)] = names(anno_grs)[i]
+      overlaps_gr = findOverlaps(x, anno_grs[[i]])
+      x$anno[S4Vectors::queryHits(overlaps_gr)] = names(anno_grs)[i]
 
     }
     x
@@ -261,6 +261,18 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
   fq_dt
 }
 
+.get_fetch_fun = function(files){
+  is_bam = grepl(".bam$", files)
+  if(all(is_bam)){
+    fetch_fun = seqsetvis::ssvFetchBam
+  }else if(all(!is_bam)){
+    fetch_fun = seqsetvis::ssvFetchBigwig
+  }else{
+    stop("Files should be either all bams or all bigwigs. No mixing!")
+  }
+  fetch_fun
+}
+
 #' make_centered_query_gr
 #'
 #' Returns version of query_gr GRanges centered on the maximum signal in
@@ -326,14 +338,7 @@ make_centered_query_gr = function(query_dt, query_gr, view_size = NULL,
   }else{
     files = query_dt[[1]]
   }
-  is_bam = grepl(".bam$", files)
-  if(all(is_bam)){
-    fetch_fun = seqsetvis::ssvFetchBam
-  }else if(all(!is_bam)){
-    fetch_fun = seqsetvis::ssvFetchBigwig
-  }else{
-    stop("Files should be either all bams or all bigwigs. No mixing!")
-  }
+  fetch_fun = .get_fetch_fun(files)
   stopifnot("GRanges" %in% class(query_gr))
   if(is.null(view_size)){
     view_size = median(width(query_gr))
@@ -461,7 +466,21 @@ make_peak_dt = function(peak_grs, treatments = NULL){
   peak_dt
 }
 
-
+.get_files = function(query_dt){
+  if(!is.null(query_dt$file)){
+    files = query_dt$file
+  }else{
+    files = query_dt[[1]]
+  }
+  if(!is.null(query_dt$sample)){
+    uniq_names = query_dt$sample
+  }else{
+    uniq_names = basename(files)
+  }
+  stopifnot(!any(duplicated(uniq_names)))
+  names(files) = uniq_names
+  files
+}
 
 #' make_scc_dt
 #'
@@ -514,18 +533,7 @@ make_scc_dt = function(query_dt,
                        n_cores = getOption("mc.cores", 1L),
                        ...){
   if(is.character(query_dt)) query_dt = data.table(file = query_dt, sample = basename(query_dt))
-  if(!is.null(query_dt$file)){
-    files = query_dt$file
-  }else{
-    files = query_dt[[1]]
-  }
-  if(!is.null(query_dt$sample)){
-    uniq_names = query_dt$sample
-  }else{
-    uniq_names = basename(files)
-  }
-  stopifnot(!any(duplicated(uniq_names)))
-  names(files) = uniq_names
+  files = .get_files(query_dt)
   scc_res_l = lapply(files, function(f){
     make_scc_dt.single(f, query_gr,
                        frag_sizes = frag_sizes,
@@ -649,4 +657,87 @@ make_scc_dt.single = function(bam_file,
   corr_res
 }
 
+#' make_feature_overlap_signal_profiles
+#'
+#' Creates a data.table with grouping for profiles based on overlaps in overlap_gr and ranking of signal within each.
+#'
+#' @param query_dt data.table that specifies file paths with $file.  Suitable for use with \link[seqsetvis]{ssvFetchBam} or \link[seqsetvis]{ssvFetchBigwig}
+#' @param overlaps_gr GRanges with membership table in mcols.  Create with \link[seqsetvis]{ssvOverlapIntervalSets} or \link[seqsetvis]{ssvConsensusIntervalSets}.
+#' @param view_size Size of regions to fetch.  Will be median of widths of overlaps_gr if NULL. Default is NULL.
+#' @param group_var character. Must not already be present in query_dt  Will be added. Default is "overlap_group".
+#' @param rank_var character. Must not already be present in query_dt  Will be added. Default is "rnk".
+#' @param min_group_size Groups smaller than this are allowed but larger groups won't be shrunk below this length. Default is 50.
+#' @param max_group_size Even if the smallest group is larger than this, no group will exceed this size. Default is 500.
+#' @param discard_group_below Groups smaller than this will be discarded entirely. Default is 1.
+#' @param ...
+#'
+#' @return A profile data.table with overlap grouping information add and independent ranking added to each group.
+#' @export
+#'
+#' @examples
+#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
+#' query_dt = make_dt(bw_files)
+#' query_dt[, sample := sub("_FE_random100.A", "", name)]
+#'
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' names(peak_files) = sub("_CTCF_rand.+", "", basename(peak_files))
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files, )
+#' overlaps_gr = seqsetvis::ssvOverlapIntervalSets(peak_grs)
+#' query_gr = resize(overlaps_gr, 6e2, fix = "center")
+#'
+#' group_prof_dt = make_feature_overlap_signal_profiles(query_dt, overlaps_gr)
+#' plot_feature_overlap_signal_profiles(group_prof_dt)
+make_feature_overlap_signal_profiles = function(query_dt,
+                                                overlaps_gr,
+                                                view_size = NULL,
+                                                group_var = "overlap_group",
+                                                rank_var = "rnk",
+                                                min_group_size = 50,
+                                                max_group_size = 500,
+                                                discard_group_below = 1,
+                                                ...){
+  if(is.character(query_dt)) query_dt = data.table(file = query_dt)
+  if(is.null(view_size)) view_size = median(width(overlaps_gr))
 
+  if(group_var %in% colnames(query_dt)) stop("group_var \"", group_var, "\" cannot be in colnames of query_dt.")
+  if(rank_var %in% colnames(query_dt)) stop("rank_var \"", rank_var, "\" cannot be in colnames of query_dt.")
+
+  feature_groups = as.data.table(seqsetvis::ssvFactorizeMembTable(overlaps_gr))
+  # hist(width(overlaps_gr))
+  qgr = resize(overlaps_gr, view_size, fix = "center")
+  qgr_l = split(qgr[feature_groups$id], feature_groups$group)
+  qgr_l$none = NULL
+
+  sm_len = max(min(lengths(qgr_l)), min_group_size)
+  qgr_l.sample = lapply(qgr_l, function(x){sample(x, min(max_group_size, sm_len, length(x)))})
+  qgr_l.sample = qgr_l.sample[!lengths(qgr_l.sample) < discard_group_below]
+
+  files = .get_files(query_dt)
+  fetch_fun = .get_fetch_fun(files)
+
+  fetch_list_profiles = function(qgr_list){
+    prof_dt_l = lapply(qgr_list, function(x){
+      prof_dt = suppressMessages({
+        fetch_fun(query_dt,
+                 unique_names = query_dt$name,
+                 resize(x, view_size, fix = "center"),
+                 return_data.table = TRUE,
+                 ...)
+      })
+
+      prof_dt
+    })
+
+    prof_dt = rbindlist(prof_dt_l, idcol = group_var)
+    rnk_dt = prof_dt[, .(y = max(y)), c("id", group_var)]
+    rnk_dt[, rnk_ := frank(-y, ties.method = "first"), c(group_var)]
+    prof_dt = merge(prof_dt, rnk_dt[, .(id, rnk_)], by = "id")
+    setnames(prof_dt, "rnk_", rank_vars)
+
+    prof_dt$name = factor(prof_dt$name)
+    prof_dt$name = factor(prof_dt$name, levels = levels(prof_dt$name)[c(4:5, 2:3, 1)])
+    prof_dt
+  }
+  prof_dt = fetch_list_profiles(qgr_l.sample)
+  prof_dt
+}

@@ -532,3 +532,94 @@ plot_anno_overlap = function(anno_dt, name_lev = NULL){
     theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1))
   return(list(plot = p_features, data = anno_dt))
 }
+
+
+#' plot_feature_overlap_signal_profiles
+#'
+#' @param grouped_prof_dt Output of \code{make_feature_overlap_signal_profiles}
+#' @param group_var character. Must already be present in grouped_prof_dt.  Use \code{make_feature_overlap_signal_profiles} to add properly. Default is "overlap_group".
+#' @param rank_varcharacter. Must already be present in grouped_prof_dt.  Use \code{make_feature_overlap_signal_profiles} to add properly. Default is "rnk".
+#' @param fill_limits Limits of heatmap fill scale.
+#' @param signal_var value to plot
+#'
+#' @return list of ggplot plots that use feature overlaps to plot signal
+#' @export
+#'
+#' @examples
+#' bw_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bw$", full.names = TRUE)
+#' query_dt = make_dt(bw_files)
+#' query_dt[, sample := sub("_FE_random100.A", "", name)]
+#'
+#' peak_files = dir(system.file("extdata", package = "seqqc"), pattern = "Peak$", full.names = TRUE)
+#' names(peak_files) = sub("_CTCF_rand.+", "", basename(peak_files))
+#' peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files, )
+#' overlaps_gr = seqsetvis::ssvOverlapIntervalSets(peak_grs)
+#' query_gr = resize(overlaps_gr, 6e2, fix = "center")
+#'
+#' group_prof_dt = make_feature_overlap_signal_profiles(query_dt, overlaps_gr)
+#' plot_feature_overlap_signal_profiles(group_prof_dt)
+plot_feature_overlap_signal_profiles = function(grouped_prof_dt, group_var = "overlap_group", rank_var = "rnk", fill_limits = NULL, signal_var = "y"){
+  stopifnot(group_var %in% colnames(grouped_prof_dt))
+  stopifnot(rank_var %in% colnames(grouped_prof_dt))
+  grouped_prof_dt[[rank_var]] = factor(grouped_prof_dt[[rank_var]])
+  grouped_prof_dt[[rank_var]] = factor(grouped_prof_dt[[rank_var]], levels = rev(levels(grouped_prof_dt[[rank_var]])))
+  if(is.null(fill_limits)){
+    fill_limits = range(grouped_prof_dt[[signal_var]])
+  }
+  grouped_prof_dt[, plot_fill := get(signal_var)]
+
+  grouped_prof_dt[plot_fill > max(fill_limits), plot_fill := max(fill_limits)]
+  grouped_prof_dt[plot_fill < min(fill_limits), plot_fill := min(fill_limits)]
+
+  p2_heat_overlaps = ggplot(grouped_prof_dt, aes_string(x = "x", y = rank_var, fill = "plot_fill")) +
+    geom_raster() +
+    scale_fill_viridis_c(limits = fill_limits) +
+    facet_grid(paste0("name~", group_var)) +
+    labs(fill = "read pileup", y = "", x = "bp", title = "Signal at peak overlap sets") +
+    theme(panel.background = element_blank(), axis.text.y = element_blank(), axis.ticks.y = element_blank())
+  p2_heat_overlaps
+
+  agg_dt = grouped_prof_dt[, .(y = mean(y)), c("name", group_var, "x")]
+
+  p2_line_facets = ggplot(agg_dt, aes_string(x = "x", y = signal_var, color = "name")) +
+    geom_path() +
+    facet_grid(paste0("name~", group_var), scales = "free_y") +
+    labs(y = "mean read pileup", x = "bp", color = "")
+  list(heatmap = p2_heat_overlaps, lineplot = p2_line_facets)
+}
+
+# plot_signal_cluster_artifacts = function(artifact_profiles, signal_profiles){
+#   xy_dt = prof_dt[abs(x) < 200, .(y = mean(y)), .(group, name, id)]
+#   xy_dt = dcast(xy_dt, id+group~name, value.var = "y")
+#
+#   xy_dt[, signal := (TR_V_1 + TR_V_2 + TR_T3_1 + TR_T3_2)/4]
+#
+#   cutoff = 4
+#
+#   ggplot(xy_dt, aes(x = log10(signal+1), y = log10(control_IgG_1+1), color = group)) +
+#     geom_point() +
+#     annotate("line", x = range(log10(xy_dt$signal)), y = log10(cutoff+1))
+#
+#   # ggplot(xy_dt, aes(x = signal, y = control_IgG_1-signal, color = group)) +
+#   #   geom_point()
+#
+#   xy_dt[, artifact := ifelse(control_IgG_1 > signal | control_IgG_1 > cutoff, "artifact", "signal")]
+#   table(xy_dt$artifact)
+#
+#   prof_dt$artifact = NULL
+#   prof_dt = merge(prof_dt, xy_dt[, .(id, artifact)], by = "id")
+#
+#   prof_dt[, .N, .(id, sample, x)][order(N)]
+#   prof_dt[id == 1003 & sample == "TR_T3_1" & x == -2975]
+#
+#
+#   clust_dt.artifact = ssvSignalClustering(prof_dt[artifact == "artifact"], facet_ = "sample",
+#                                           max_cols = Inf, max_rows = Inf)
+#   ssvSignalHeatmap(clust_dt.artifact, facet_ = "sample", fill_limits = c(0, 20)) +
+#     labs(title = "artifact sites")
+#
+#   clust_dt.not_artifact = ssvSignalClustering(prof_dt[artifact != "artifact"], facet_ = "sample",
+#                                               max_cols = Inf, max_rows = Inf)
+#   ssvSignalHeatmap(clust_dt.not_artifact, facet_ = "sample", fill_limits = c(0, 20)) +
+#     labs(title = "artifact sites")
+# }
