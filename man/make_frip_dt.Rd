@@ -4,7 +4,12 @@
 \alias{make_frip_dt}
 \title{make_frip_dt}
 \usage{
-make_frip_dt(query_dt, query_gr, n_cores = getOption("mc.cores", 1))
+make_frip_dt(
+  query_dt,
+  query_gr,
+  n_cores = getOption("mc.cores", 1),
+  name_lev = NULL
+)
 }
 \arguments{
 \item{query_dt}{data.table with query information. Only really needs file as
@@ -13,6 +18,9 @@ first column.}
 \item{query_gr}{GRanges to be centered.}
 
 \item{n_cores}{Number of cores to use. Defaults to mc.cores if set or 1.}
+
+\item{name_lev}{Optional levels to impose order in feature sets.  Default of
+NULL uses decreasing FRIP score.}
 }
 \value{
 a data.table with reads_in_peak, mapped_reads, and frip data for all

@@ -250,6 +250,54 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
 
 }
 
+#' plot_scc_dt
+#'
+#' plot strand cross correlation (SCC) info
+#'
+#' @param scc_dt output from \code{\link{make_scc_dt}}
+#'
+#' @return list of ggplots relevant to SCC
+#' @export
+#'
+#' @examples
+#' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
+#' query_dt.bam = make_dt(bam_files)
+#'
+#' query_gr = CTCF_in_10a_overlaps_gr
+#'
+#' scc_dt = make_scc_dt(query_dt.bam, query_gr)
+#' plot_scc_dt(scc_dt)
+plot_scc_dt = function(scc_dt){
+  correlation = read_length = fragment_length = name = id = read_correlation = fragment_correlation = NULL #global bindings for data.table
+  scc_dt_agg = scc_dt$average_correlation
+
+  p_scc_correlation = ggplot(scc_dt_agg, aes(x = shift, y = correlation)) +
+    geom_path() +
+    facet_wrap(~name) +
+    geom_vline(data = scc_dt$read_length, aes(xintercept = read_length), color = "red", linetype = 2) +
+    geom_vline(data = scc_dt$fragment_length, aes(xintercept = fragment_length), color = "blue", linetype = 2) +
+    labs(title = "Strand Cross Correlation (SCC)", subtitle = "estimated fragment size in blue, read length in red")
+
+
+  scc_dt_p = merge(scc_dt$read_correlation[, list(name, id, read_correlation = correlation)],
+                   scc_dt$stable_fragment_correlation[, list(name, id, fragment_correlation = correlation)], by = c("name", "id"))
+  p_scc_frag_vs_read = ggplot(scc_dt_p, aes(x = read_correlation, y = fragment_correlation)) +
+    annotate("rect", xmin = .9, xmax = 1.03,
+             ymin = min(scc_dt_p$fragment_correlation),
+             ymax = max(scc_dt_p$fragment_correlation), fill = "#FF000015") +
+    geom_point(alpha = .1) +
+    expand_limits(x = c(0, 1), y = c(0, 1)) +
+    facet_wrap(~name) +
+    theme(panel.background = element_blank(), panel.grid = element_blank()) +
+    labs(title = "Peaks in the red zone have quite high\ncorrelation at read length and are likely artifacts",
+         x = "read length SCC",
+         y = "fragment length estimate SCC")
+  return(list(
+    scc_curves = p_scc_correlation,
+    scc_dots = p_scc_frag_vs_read
+  ))
+}
+
 #'plot_signals
 #'
 #'Performs clustering on signal profiles in prof_dt and produces various plots.
@@ -300,6 +348,7 @@ plot_frip_dt = function(frip_dt, peak_dt = NULL, fq_dt = NULL, query_gr = NULL, 
 #'
 #' bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
 #' query_dt.bam = make_dt(bam_files)
+#'
 #' frip_dt = make_frip_dt(query_dt.bam, query_gr)
 #'
 #' sig_res.frip = plot_signals(prof_dt, query_gr, frip_dt = frip_dt)
@@ -394,10 +443,10 @@ plot_signals = function(prof_dt, query_gr, assign_dt = NULL, n_to_plot = 500, fi
     anno_signal_dt = make_feature_as_signal_dt(anno_grs, query_gr)
     anno_clust_dt = anno_signal_dt[id %in% toplot_id]
     anno_clust_dt$id = factor(anno_clust_dt$id, levels = levels(clust_dt$id))
-    anno_clust_dt$sample = factor(anno_clust_dt$sample, levels = rev(names(anno_grs)))
+    anno_clust_dt$feature_type = factor(anno_clust_dt$feature_type, levels = rev(names(anno_grs)))
     p_heat_anno = ggplot(anno_clust_dt, aes(x = x, y = id, fill = y>0)) +
       geom_raster() +
-      facet_wrap(~sample, nrow = 1) +
+      facet_wrap(~feature_type, nrow = 1) +
       theme(axis.text.y = element_blank(), axis.ticks.y = element_blank()) +
       scale_fill_manual(values = c("FALSE" = "gray80", "TRUE" = "gray20")) +
       scale_x_continuous(labels = function(x)x/1e3) +
@@ -409,10 +458,10 @@ plot_signals = function(prof_dt, query_gr, assign_dt = NULL, n_to_plot = 500, fi
     p_fripHeat = ggplot() + theme_void() + labs(title = "frip_dt no provided")
     p_clust_text = ggplot() + theme_void() + labs(title = "frip_dt no provided")
   }else{
+    stopifnot(any(frip_dt$id %in% assign_dt$id))
     dt.heat = copy(frip_dt)
-    assign_dt = unique(clust_dt[, list(id, cluster_id)])
     dt.heat = merge(dt.heat, assign_dt, by = "id")
-    tmp = dt.heat[, list(reads_in_peak = sum(reads_in_peak), mapped_reads = unique(mapped_reads)), list(sample, treatment, name, cluster_id)]
+    tmp = dt.heat[, list(reads_in_peak = sum(reads_in_peak), mapped_reads = unique(mapped_reads)), list(treatment, name, cluster_id)]
     tmp[, frip := reads_in_peak / mapped_reads]
 
     .genome_fraction = function(x){
@@ -439,8 +488,8 @@ plot_signals = function(prof_dt, query_gr, assign_dt = NULL, n_to_plot = 500, fi
 
     p_clust_text = ggplot(dt.heat_summary, aes(x = name, y = factor(cluster_id), label = txt)) +
       geom_text(size = 5, color = NA) +
-      geom_text(data = dt.heat_summary, aes(x = name, cluster_id+.1, label = txt_mean), color = "red", vjust = 0) +
-      geom_text(data = dt.heat_summary, aes(x = name, cluster_id-.1, label = txt_median), color = "blue", vjust = 1) +
+      geom_text(data = dt.heat_summary, aes(x = name, as.numeric(cluster_id)+.1, label = txt_mean), color = "red", vjust = 0) +
+      geom_text(data = dt.heat_summary, aes(x = name, as.numeric(cluster_id)-.1, label = txt_median), color = "blue", vjust = 1) +
       theme(axis.text.x = element_text(angle = 45, hjust = 1, vjust = 1), panel.background = element_blank(), panel.grid = element_blank()) +
       labs(y = "cluster", x= "", title = "mean FRIP e6", subtitle = "median FRIP e6") +
       theme(plot.title = element_text(size = 14, color = "red"), plot.subtitle = element_text(size = 14, color = "blue"))
@@ -450,9 +499,11 @@ plot_signals = function(prof_dt, query_gr, assign_dt = NULL, n_to_plot = 500, fi
     p_scc_correlation = ggplot() + theme_void() + labs(title = "scc_dt no provided")
     p_scc_frag_vs_read = ggplot() + theme_void() + labs(title = "scc_dt no provided")
   }else{
+
     scc_dt_agg = scc_dt$full_correlation_results
+    stopifnot(any(scc_dt_agg$id %in% assign_dt$id))
     scc_dt_agg = merge(scc_dt_agg, assign_dt, by = "id")
-    scc_dt_agg = scc_dt_agg[, list(correlation = mean(correlation)), list(sample, shift, name, cluster_id)]
+    scc_dt_agg = scc_dt_agg[, list(correlation = mean(correlation)), list(shift, name, cluster_id)]
 
     p_scc_correlation = ggplot(scc_dt_agg, aes(x = shift, y = correlation)) +
       geom_path() +

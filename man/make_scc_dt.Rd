@@ -12,6 +12,7 @@ make_scc_dt(
   cache_path = "~/.cache_peakrefine",
   cache_version = "v1",
   force_overwrite = FALSE,
+  name_var = "name",
   n_cores = getOption("mc.cores", 1L),
   ...
 )
@@ -36,6 +37,8 @@ is 3*max(frag_sizes).}
 all results going forward. Default is v1.}
 
 \item{force_overwrite}{Logical, if TRUE, cache contents will be overwritten.}
+
+\item{name_var}{Character. Variable where name information is stored.}
 
 \item{n_cores}{Number of cores to use. Defaults to mc.cores if set or 1.}
 

@@ -28,5 +28,5 @@ peak_grs = seqsetvis::easyLoad_narrowPeak(peak_files)
 query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
 anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
 anno_dt$id = factor(anno_dt$id, levels = rev(unique(anno_dt$id)))
-ggplot(anno_dt, aes(x = x, fill = y, y = id)) + geom_tile() + facet_wrap(~sample)
+ggplot(anno_dt, aes(x = x, fill = y, y = id)) + geom_tile() + facet_wrap(~feature_type)
 }

@@ -20,7 +20,6 @@ crossCorrByRle = function(bam_file,
     }else{
       #both names() and $name are set, leave it alone
     }
-
   }
   names(query_gr) = query_gr$name
   # query_gr = resize(query_gr, 500, fix = "center")

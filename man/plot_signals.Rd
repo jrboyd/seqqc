@@ -76,6 +76,7 @@ sig_res.anno$annotation_heatmap
 
 bam_files = dir(system.file("extdata", package = "seqqc"), pattern = "^M.+bam$", full.names = TRUE)
 query_dt.bam = make_dt(bam_files)
+
 frip_dt = make_frip_dt(query_dt.bam, query_gr)
 
 sig_res.frip = plot_signals(prof_dt, query_gr, frip_dt = frip_dt)

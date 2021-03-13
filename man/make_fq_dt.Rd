@@ -7,7 +7,7 @@
 make_fq_dt(
   fastq_files,
   fastq_names = basename(fastq_files),
-  fastq_treatments = c("fq", "gz", "fq", "gz"),
+  fastq_treatments = fastq_names,
   n_cores = getOption("mc.cores", 1),
   cache_counts = TRUE
 )

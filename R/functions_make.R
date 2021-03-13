@@ -112,6 +112,18 @@ make_anno_grs = function(gtf_file){
 #'
 #' make_anno_dt(peak_grs, anno_grs)
 make_anno_dt =  function(peak_grs, anno_grs, name_lev = NULL){
+  if(!is.list(peak_grs)){
+    if("GRanges" %in% class(peak_grs)){
+      peak_grs = list(peak_grs)
+      names(peak_grs) = "peaks"
+    }else{
+      stop("peak_grs must be a list of GRanges or a single GRanges.")
+    }
+  }else{
+    if(!all(sapply(peak_grs, function(x)"GRanges" %in% class(x)))){
+      stop("non-GRanges detected in peak_grs. Must be a list of GRanges or a single GRanges.")
+    }
+  }
   sample_cnt = count = fraction = type = tag = NULL #data.table global declaration
   if(is.null(names(peak_grs))){
     names(peak_grs) = paste("peaks", LETTERS[seq_along(peak_grs)])
@@ -204,9 +216,11 @@ make_assign_dt = function(clust_dt, cluster_var = "cluster_id", id_var = "id"){
 #' query_gr = resize(seqsetvis::ssvOverlapIntervalSets(peak_grs), 2e4, fix = "center")
 #' anno_dt = make_feature_as_signal_dt(anno_grs, query_gr)
 #' anno_dt$id = factor(anno_dt$id, levels = rev(unique(anno_dt$id)))
-#' ggplot(anno_dt, aes(x = x, fill = y, y = id)) + geom_tile() + facet_wrap(~sample)
+#' ggplot(anno_dt, aes(x = x, fill = y, y = id)) + geom_tile() + facet_wrap(~feature_type)
 make_feature_as_signal_dt = function(anno_grs, query_gr){
-  seqsetvis::ssvFetchGRanges(anno_grs, query_gr, return_data.table = TRUE)
+  f_dt = seqsetvis::ssvFetchGRanges(anno_grs, query_gr, return_data.table = TRUE)
+  setnames(f_dt, "sample", "feature_type")
+  f_dt
 }
 
 
@@ -231,9 +245,18 @@ make_feature_as_signal_dt = function(anno_grs, query_gr){
 #'  #make_fq_dt(fq_files,
 #'  #  fastq_names = c("4_reads_fq", "4_reads_gz", "5_reads_fq", "5_reads_gz"),
 #'  #  cache_counts = FALSE)
-make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_treatments = c("fq", "gz", "fq", "gz"), n_cores = getOption("mc.cores", 1), cache_counts = TRUE){
+make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_treatments = fastq_names, n_cores = getOption("mc.cores", 1), cache_counts = TRUE){
   message("count fastq reads...")
+  dt_mode = FALSE
+  if(is.data.table(fastq_files)){
+    dt_mode = TRUE
+    .config_dt = fastq_files
+    fastq_files = .get_files(.config_dt)
+    .config_dt$file = fastq_files
+  }
 
+  stopifnot(length(fastq_files) == length(fastq_names))
+  stopifnot(length(fastq_files) == length(fastq_treatments))
   .cnt_fq = function(f){
     cnt_f = paste0(f, ".cnt")
     if(!file.exists(cnt_f)){
@@ -255,9 +278,14 @@ make_fq_dt = function(fastq_files, fastq_names = basename(fastq_files), fastq_tr
   }
 
   fq_dt = data.table::rbindlist(pbmcapply::pbmclapply(fastq_files, mc.cores = n_cores, .cnt_fq))
-  setnames(fq_dt, c("fastq", "count"))
-  fq_dt$name = fastq_names
-  fq_dt$treatment = fastq_treatments
+  setnames(fq_dt, c("file", "count"))
+
+  if(dt_mode){
+    fq_dt = merge(fq_dt, .config_dt, by = "file")
+  }else{
+    fq_dt$name = fastq_names
+    fq_dt$treatment = fastq_treatments
+  }
   fq_dt
 }
 
@@ -376,7 +404,8 @@ make_centered_query_gr = function(query_dt, query_gr, view_size = NULL,
 #'   first column.
 #' @param query_gr GRanges to be centered.
 #' @param n_cores Number of cores to use. Defaults to mc.cores if set or 1.
-#'
+#' @param name_lev Optional levels to impose order in feature sets.  Default of
+#'   NULL uses decreasing FRIP score.
 #' @return a data.table with reads_in_peak, mapped_reads, and frip data for all
 #'   bam files in query_dt at each region in query_gr.
 #' @export
@@ -392,7 +421,7 @@ make_centered_query_gr = function(query_dt, query_gr, view_size = NULL,
 #' query_gr = seqsetvis::easyLoad_bed(peak_file)[[1]]
 #'
 #' make_frip_dt(bam_file, query_gr)
-make_frip_dt = function(query_dt, query_gr, n_cores = getOption("mc.cores", 1)){
+make_frip_dt = function(query_dt, query_gr, n_cores = getOption("mc.cores", 1), name_lev = NULL){
   name = treatment = qname = id = frip = N = mapped_reads = V1 = NULL#global data.table bindings
   if(is.character(query_dt)){
     query_dt = data.table(file = query_dt)
@@ -403,16 +432,17 @@ make_frip_dt = function(query_dt, query_gr, n_cores = getOption("mc.cores", 1)){
   if(is.null(query_dt$name)){
     query_dt[, name := basename(file)]
   }
+  if(!is.null(name_lev)) stopifnot(all(query_dt$name %in% name_lev))
   if(is.null(query_dt$treatment)){
     query_dt[, treatment := name]
   }
 
   n_region_splits = max(1, floor(length(query_gr) / 1e3))
   message("fetch read counts...")
-  reads_dt = seqsetvis::ssvFetchBam(query_dt, query_gr, fragLens = NA, return_unprocessed = TRUE, n_region_splits = n_region_splits, n_cores = n_cores)
-
-  frip_dt = reads_dt[, list(N = length(unique(qname))), list(id, name, treatment, sample)]
-  unique(frip_dt[, list(name, treatment, sample)])
+  # reads_dt = seqsetvis::ssvFetchBam(query_dt, query_gr, fragLens = NA, return_unprocessed = TRUE, n_region_splits = n_region_splits, n_cores = n_cores)
+  # frip_dt = reads_dt[, list(N = length(unique(qname))), list(id, name, treatment, sample)]
+  frip_dt = seqsetvis::ssvFetchBam(query_dt, query_gr, fragLens = 1, win_size = 1, win_method = "summary", summary_FUN = function(x,w){sum(x)}, n_region_splits = n_region_splits, n_cores = n_cores, return_data.table = TRUE)
+  setnames(frip_dt, "y", "N")
 
   frip_dt_filled = melt(dcast(frip_dt, id~name, value.var = "N", fill = 0), id.vars = "id", value.name = "N", variable.name = "name")
   frip_dt = merge(frip_dt_filled, unique(frip_dt[, list(name, treatment, sample)]), by = "name")
@@ -426,7 +456,10 @@ make_frip_dt = function(query_dt, query_gr, n_cores = getOption("mc.cores", 1)){
   frip_dt$mapped_reads = mapped_counts[frip_dt$sample]
   frip_dt[, frip := N/mapped_reads]
 
-  name_lev = frip_dt[, stats::median(N) , list(name)][rev(order(V1))]$name
+  if(is.null(name_lev)){
+    name_lev = frip_dt[, stats::median(N) , list(name)][rev(order(V1))]$name
+  }
+
   stopifnot(all(frip_dt$name %in% name_lev))
   frip_dt$name = factor(frip_dt$name, levels = name_lev)
   setnames(frip_dt, "N", "reads_in_peak")
@@ -472,7 +505,9 @@ make_peak_dt = function(peak_grs, treatments = NULL){
   }else{
     files = query_dt[[1]]
   }
-  if(!is.null(query_dt$sample)){
+  if(!is.null(query_dt$name)){
+    uniq_names = query_dt$name
+  }else if(!is.null(query_dt$sample)){
     uniq_names = query_dt$sample
   }else{
     uniq_names = basename(files)
@@ -500,6 +535,7 @@ make_peak_dt = function(peak_grs, treatments = NULL){
 #' @param cache_version Modifying the cache version will force recalulation of
 #'   all results going forward. Default is v1.
 #' @param force_overwrite Logical, if TRUE, cache contents will be overwritten.
+#' @param name_var Character. Variable where name information is stored.
 #' @param n_cores Number of cores to use. Defaults to mc.cores if set or 1.
 #' @param ... passed to Rsamtools::ScanBamParam()
 #'
@@ -530,11 +566,23 @@ make_scc_dt = function(query_dt,
                        cache_path = "~/.cache_peakrefine",
                        cache_version = "v1",
                        force_overwrite = FALSE,
+                       name_var = "name",
                        n_cores = getOption("mc.cores", 1L),
                        ...){
-  if(is.character(query_dt)) query_dt = data.table(file = query_dt, sample = basename(query_dt))
+
+  if(is.character(query_dt)) query_dt = data.table(file = query_dt, name = basename(query_dt))
+  if(!name_var %in% colnames(query_dt)){
+    stop(
+      paste(collapse = "\n",
+            c(paste0("name_var \"", name_var, "\" was not found in colnames of query_dt!"),
+              colnames(query_dt))
+      )
+    )
+  }
+  stopifnot()
   files = .get_files(query_dt)
   scc_res_l = lapply(files, function(f){
+    message("SCC for ", f)
     make_scc_dt.single(f, query_gr,
                        frag_sizes = frag_sizes,
                        fetch_size = fetch_size,
@@ -556,8 +604,8 @@ make_scc_dt = function(query_dt,
       # }
       xv
     })
-    dt = rbindlist(part, idcol = "sample")
-    merge(dt, query_dt, by = 'sample')
+    dt = rbindlist(part, idcol = name_var)
+    merge(dt, query_dt, by = name_var)
   })
   names(scc_res) = vnames
   scc_res
@@ -584,7 +632,7 @@ make_scc_dt = function(query_dt,
 #'
 #' @return list fo tidy data.table of SCC data for bam_file
 #'
-#' @import tools digest
+#' @import tools digest pbmcapply
 #'
 #' @examples
 #' peak_file = dir(system.file("extdata", package = "seqqc"),
@@ -624,7 +672,20 @@ make_scc_dt.single = function(bam_file,
   stopifnot(n_cores >= 1)
 
   query_gr = resize(query_gr, fetch_size, fix = 'center')
-
+  if(is.null(query_gr$name)){
+    if(is.null(names(query_gr))){
+      query_gr$name = paste0("peak_", seq_along(query_gr))
+    }else{
+      query_gr$name = names(query_gr)
+    }
+  }else{
+    if(is.null(names(query_gr))){
+      names(query_gr) = query_gr$name
+    }else{
+      #both names() and $name are set, leave it alone
+    }
+  }
+  stopifnot(!any(duplicated(names(query_gr))))
 
   bfc_corr = BiocFileCache::BiocFileCache(cache_path, ask = FALSE)
   corr_key = paste(qgr_md5, bam_md5, digest::digest(frag_sizes), fetch_size, cache_version, sep = "_")
@@ -635,7 +696,7 @@ make_scc_dt.single = function(bam_file,
     table(grps)
     # browser()
     rl = getReadLength(bam_file, query_gr)
-    lres = parallel::mclapply(unique(grps), function(g){
+    lres = pbmcapply::pbmclapply(unique(grps), function(g){
       k = grps == g
       crossCorrByRle(bam_file, query_gr[k], fragment_sizes = frag_sizes, read_length = rl, ...)
     })
@@ -720,10 +781,10 @@ make_feature_overlap_signal_profiles = function(query_dt,
     prof_dt_l = lapply(qgr_list, function(x){
       prof_dt = suppressMessages({
         fetch_fun(query_dt,
-                 unique_names = query_dt$name,
-                 resize(x, view_size, fix = "center"),
-                 return_data.table = TRUE,
-                 ...)
+                  unique_names = query_dt$name,
+                  resize(x, view_size, fix = "center"),
+                  return_data.table = TRUE,
+                  ...)
       })
 
       prof_dt
